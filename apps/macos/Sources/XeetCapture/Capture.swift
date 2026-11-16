@@ -124,62 +124,95 @@ enum Capturer {
     }
 }
 
-/// A full-screen transparent overlay to drag out a region; Escape cancels.
+/// The drag surface: draws the dim layer and the selection, reports the rect.
+@MainActor
+final class RegionView: NSView {
+    var onDone: ((Result<CGRect, Error>) -> Void)?
+    private var start: NSPoint?
+    private var rect: NSRect = .zero
+
+    override var isFlipped: Bool { true } // top-left origin = display-local points
+    override var acceptsFirstResponder: Bool { true }
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+    override func resetCursorRects() { addCursorRect(bounds, cursor: .crosshair) }
+
+    override func draw(_ dirtyRect: NSRect) {
+        NSColor.black.withAlphaComponent(0.25).setFill()
+        bounds.fill()
+        if rect.width > 0 && rect.height > 0 {
+            NSGraphicsContext.current?.compositingOperation = .clear
+            rect.fill()
+            NSGraphicsContext.current?.compositingOperation = .sourceOver
+            NSColor.white.setStroke()
+            let p = NSBezierPath(rect: rect)
+            p.lineWidth = 1
+            p.stroke()
+        }
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        start = convert(event.locationInWindow, from: nil)
+        rect = .zero
+        needsDisplay = true
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        guard let s = start else { return }
+        let p = convert(event.locationInWindow, from: nil)
+        rect = NSRect(x: min(s.x, p.x), y: min(s.y, p.y), width: abs(p.x - s.x), height: abs(p.y - s.y))
+        needsDisplay = true
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        let r = rect
+        onDone?(r.width < 4 || r.height < 4 ? .failure(CaptureError.cancelled) : .success(r))
+    }
+
+    override func keyDown(with event: NSEvent) {
+        if event.keyCode == 53 { onDone?(.failure(CaptureError.cancelled)) } // Escape
+    }
+}
+
+/// A full-screen overlay to drag out a region; Escape cancels.
 @MainActor
 final class RegionSelector: NSWindow {
-    private var start: NSPoint?
-    private var current: NSRect = .zero
     private var continuation: CheckedContinuation<CGRect, Error>?
-    private let box = NSView()
+    /// Held strongly for the life of the selection (a window nobody owns vanishes).
+    private static var active: RegionSelector?
 
     static func select(on screen: NSScreen) async throws -> CGRect {
-        try await withCheckedThrowingContinuation { (c: CheckedContinuation<CGRect, Error>) in
+        let rect = try await withCheckedThrowingContinuation { (c: CheckedContinuation<CGRect, Error>) in
             let w = RegionSelector(screen: screen)
+            active = w
             w.continuation = c
-            w.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
-            NSCursor.crosshair.push()
+            w.makeKeyAndOrderFront(nil)
+            w.makeFirstResponder(w.contentView)
         }
+        active = nil
+        // Let the overlay leave the screen before the pixels are taken.
+        try? await Task.sleep(nanoseconds: 250_000_000)
+        return rect
     }
 
     init(screen: NSScreen) {
         super.init(contentRect: screen.frame, styleMask: .borderless, backing: .buffered, defer: false)
+        isReleasedWhenClosed = false
+        hasShadow = false
+        collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
         level = .screenSaver
         isOpaque = false
-        backgroundColor = NSColor.black.withAlphaComponent(0.15)
+        backgroundColor = .clear
         ignoresMouseEvents = false
-        box.wantsLayer = true
-        box.layer?.borderColor = NSColor.white.cgColor
-        box.layer?.borderWidth = 1
-        box.layer?.backgroundColor = NSColor.white.withAlphaComponent(0.1).cgColor
-        contentView?.addSubview(box)
+        let v = RegionView(frame: NSRect(origin: .zero, size: screen.frame.size))
+        v.onDone = { [weak self] r in self?.finish(r) }
+        contentView = v
     }
 
     override var canBecomeKey: Bool { true }
-
-    override func mouseDown(with event: NSEvent) { start = event.locationInWindow }
-
-    override func mouseDragged(with event: NSEvent) {
-        guard let s = start else { return }
-        let p = event.locationInWindow
-        current = NSRect(x: min(s.x, p.x), y: min(s.y, p.y), width: abs(p.x - s.x), height: abs(p.y - s.y))
-        box.frame = current
-    }
-
-    override func mouseUp(with event: NSEvent) {
-        let height = frame.height
-        let r = current
-        finish(r.width < 4 || r.height < 4 ? .failure(CaptureError.cancelled)
-               // Window coordinates are bottom-left; the display-local rect is top-left.
-               : .success(CGRect(x: r.minX, y: height - r.maxY, width: r.width, height: r.height)))
-    }
-
-    override func keyDown(with event: NSEvent) {
-        if event.keyCode == 53 { finish(.failure(CaptureError.cancelled)) } // Escape
-    }
+    override var canBecomeMain: Bool { true }
 
     private func finish(_ result: Result<CGRect, Error>) {
-        NSCursor.pop()
         orderOut(nil)
         continuation?.resume(with: result)
         continuation = nil

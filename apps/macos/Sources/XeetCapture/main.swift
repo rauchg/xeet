@@ -10,6 +10,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let hotkeys = Hotkeys()
     var last: CaptureReport?
     var lastError: String?
+    var rightClickMonitor: Any?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         status.button?.title = "◎"
@@ -17,6 +18,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         status.button?.target = self
         status.button?.action = #selector(statusClicked(_:))
         status.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
+        // ⌥ + right-click anywhere starts a region capture. (A global monitor
+        // observes the click; the app underneath still receives it.)
+        rightClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: .rightMouseDown) { [weak self] e in
+            guard e.modifierFlags.contains(.option) else { return }
+            Task { @MainActor in self?.capture(.region) }
+        }
         hotkeys.register { [weak self] kind in self?.capture(kind) }
         rebuildMenu()
         if !UserDefaults.standard.bool(forKey: "firstRunDone") {
@@ -73,6 +80,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             i.isEnabled = false
             m.addItem(i)
         }
+        let hint = NSMenuItem(title: "Right-click this icon, or ⌥ + right-click anywhere: capture region", action: nil, keyEquivalent: "")
+        hint.isEnabled = false
+        m.addItem(hint)
         m.addItem(.separator())
         if let r = last, let artifact = r.artifact {
             let summary = r.textRead ? "\(r.ocrLines) text lines, \(r.uncertainLines) uncertain" : "no text read"
