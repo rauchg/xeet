@@ -170,6 +170,7 @@ fn go(args: &Args) -> Result<u8, String> {
                 r.push(
                     Path::new(image)
                         .parent()
+                        .filter(|p| !p.as_os_str().is_empty())
                         .map(Path::to_path_buf)
                         .unwrap_or_else(|| PathBuf::from(".")),
                 );

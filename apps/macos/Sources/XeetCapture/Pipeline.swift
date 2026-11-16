@@ -61,6 +61,20 @@ enum Pipeline {
         let context = ContextBuilder.build(c)
         try JSONSerialization.data(withJSONObject: context, options: [.sortedKeys]).write(to: ctx)
 
+        // 1b. (before the artifact step, so a failure there never loses the screenshot) Conventional projections of the capture, as configured.
+        if Settings.copyImage {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setData(data, forType: .png)
+        }
+        var exported: URL?
+        if Settings.savePNG {
+            let f = DateFormatter()
+            f.dateFormat = "yyyy-MM-dd 'at' HH.mm.ss"
+            let url = Settings.exportFolder.appendingPathComponent("Xeet Capture \(f.string(from: Date())).png")
+            try data.write(to: url)
+            exported = url
+        }
+
         // 2. The artifact and local OCR, through the same engine everything else uses.
         let p = Process()
         p.executableURL = Settings.xeetBinary
@@ -76,22 +90,9 @@ enum Pipeline {
               let report = try JSONSerialization.jsonObject(with: reportData) as? [String: Any]
         else {
             let msg = String(data: err.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
-            throw CaptureError.failed("xeet capture exited \(p.terminationStatus): \(msg)")
+            throw CaptureError.failed("xeet capture exited \(p.terminationStatus): \(msg)" + (exported.map { " (PNG saved: \($0.lastPathComponent))" } ?? ""))
         }
 
-        // 3. Conventional projections of the capture, as configured.
-        if Settings.copyImage {
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setData(data, forType: .png)
-        }
-        var exported: URL?
-        if Settings.savePNG {
-            let f = DateFormatter()
-            f.dateFormat = "yyyy-MM-dd 'at' HH.mm.ss"
-            let url = Settings.exportFolder.appendingPathComponent("Xeet Capture \(f.string(from: Date())).png")
-            try data.write(to: url)
-            exported = url
-        }
         let summary = report["summary"] as? [String: Any]
         return CaptureReport(
             artifact: report["artifact"] as? String,

@@ -191,7 +191,23 @@ importers:
 
   packages/xeet: {}
 
-  packages/xeet-cli: {}
+  packages/xeet-cli:
+    optionalDependencies:
+      '@xeet/cli-darwin-arm64':
+        specifier: 0.1.0
+        version: 0.1.0
+      '@xeet/cli-darwin-x64':
+        specifier: 0.1.0
+        version: 0.1.0
+      '@xeet/cli-linux-arm64':
+        specifier: 0.1.0
+        version: 0.1.0
+      '@xeet/cli-win32-arm64':
+        specifier: 0.1.0
+        version: 0.1.0
+      '@xeet/cli-win32-x64':
+        specifier: 0.1.0
+        version: 0.1.0
 
 packages:
 
@@ -470,6 +486,37 @@ packages:
   '@vercel/oidc@4.0.8':
     resolution: {integrity: sha512-8wcmhuhrEsQlgTvPfRIeE4Y2geSaid0a1DP+um1PfNK4ETjqnfGTL5k5l7vS2T8A2gOx/MV7yNGxUJTs+0tqPQ==}
     engines: {node: '>= 20'}
+
+  '@xeet/cli-darwin-arm64@0.1.0':
+    resolution: {integrity: sha512-fCcqpHL7n0M7mVPZKny6w5/h2HCIAXHB4AcQZigXOGApbYAuZiR4jVMafJmjEF2/pBw0o8bYaPYjjMpywv3X+Q==}
+    cpu: [arm64]
+    os: [darwin]
+    hasBin: true
+
+  '@xeet/cli-darwin-x64@0.1.0':
+    resolution: {integrity: sha512-yawqetXL1bfN/2P1QYyOQRFsMGjbi8r+HNzfhbVl/YXUzWwEyBrXI711DQd5d0N0THJHkhSE1+G9/BqAaDcuGw==}
+    cpu: [x64]
+    os: [darwin]
+    hasBin: true
+
+  '@xeet/cli-linux-arm64@0.1.0':
+    resolution: {integrity: sha512-Fbo9SdXJGFrR1Q0efwjgshlQL8+wTJT5p0XEixm8Pw1sq2Tf8WINNhodZLxRQoSTqhE9MthXSGgMrpGdoqEy5w==}
+    cpu: [arm64]
+    os: [linux]
+    libc: [glibc]
+    hasBin: true
+
+  '@xeet/cli-win32-arm64@0.1.0':
+    resolution: {integrity: sha512-1n6uOGAFbO+9bJ2Mxzu+apA9pjMvPa3wQtl6Oc3lVjiHSDtsknIqAKpgtS+1UExX+6LrJ/db27+i4KpKncqlUg==}
+    cpu: [arm64]
+    os: [win32]
+    hasBin: true
+
+  '@xeet/cli-win32-x64@0.1.0':
+    resolution: {integrity: sha512-M1l54MUQMnAN07VszUV5NjkvYtBLKcOEsSHoCqhvTDK5OBdgr/V34szoG1juVYRmA/hnBGG/Df97b/pVcDM8WA==}
+    cpu: [x64]
+    os: [win32]
+    hasBin: true
 
   baseline-browser-mapping@2.11.37:
     resolution: {integrity: sha512-QYph+vfurmaxhNwi9FprfmtkT5cx2Keg8FzZ0vnjO8ukscIybVyZGMFwdllKGlTI6qyU8ck43OM9UXh+IFJihQ==}
@@ -840,6 +887,21 @@ snapshots:
       '@vercel/cli-config': 0.3.8
       '@vercel/cli-exec': 1.0.1
       jose: 5.10.0
+
+  '@xeet/cli-darwin-arm64@0.1.0':
+    optional: true
+
+  '@xeet/cli-darwin-x64@0.1.0':
+    optional: true
+
+  '@xeet/cli-linux-arm64@0.1.0':
+    optional: true
+
+  '@xeet/cli-win32-arm64@0.1.0':
+    optional: true
+
+  '@xeet/cli-win32-x64@0.1.0':
+    optional: true
 
   baseline-browser-mapping@2.11.37: {}
 

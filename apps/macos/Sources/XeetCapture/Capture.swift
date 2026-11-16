@@ -51,7 +51,14 @@ enum Capturer {
     }
 
     static func capture(_ kind: CaptureKind) async throws -> Captured {
-        guard CGPreflightScreenCaptureAccess() else { throw CaptureError.noPermission }
+        guard CGPreflightScreenCaptureAccess() else {
+            // Asking is what makes macOS list this app under Screen Recording.
+            _ = CGRequestScreenCaptureAccess()
+            if let u = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture") {
+                NSWorkspace.shared.open(u)
+            }
+            throw CaptureError.noPermission
+        }
         let content: SCShareableContent
         do {
             content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)

@@ -13,11 +13,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         status.button?.title = "◎"
+        // Left click: the menu. Right click: capture a region right away.
+        status.button?.target = self
+        status.button?.action = #selector(statusClicked(_:))
+        status.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
         hotkeys.register { [weak self] kind in self?.capture(kind) }
         rebuildMenu()
         if !UserDefaults.standard.bool(forKey: "firstRunDone") {
             firstRun()
             UserDefaults.standard.set(true, forKey: "firstRunDone")
+        }
+    }
+
+    @objc func statusClicked(_ sender: NSStatusBarButton) {
+        if NSApp.currentEvent?.type == .rightMouseUp {
+            capture(.region)
+        } else {
+            status.menu = menu
+            status.button?.performClick(nil)
+            status.menu = nil
         }
     }
 
@@ -34,12 +48,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             } catch {
                 lastError = "\(error)"
                 status.button?.title = "◎ !"
+                try? "\(Date()): \(error)\n".write(to: Settings.support.appendingPathComponent("last-error.txt"), atomically: true, encoding: .utf8)
             }
             rebuildMenu()
-            try? await Task.sleep(nanoseconds: 2_000_000_000)
-            status.button?.title = "◎"
+            if lastError == nil {
+                try? await Task.sleep(nanoseconds: 2_000_000_000)
+                status.button?.title = "◎"
+            }
         }
     }
+
+    var menu = NSMenu()
 
     func rebuildMenu() {
         let m = NSMenu()
@@ -81,7 +100,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         m.addItem(item("Shortcuts & Permissions…") { [weak self] in self?.firstRun() })
         m.addItem(.separator())
         m.addItem(item("Quit Xeet") { NSApp.terminate(nil) })
-        status.menu = m
+        menu = m
     }
 
     func firstRun() {
@@ -133,8 +152,10 @@ final class ClosureTarget: NSObject {
     @objc func fire() { run() }
 }
 
-let app = NSApplication.shared
-let delegate = AppDelegate()
-app.delegate = delegate
-app.setActivationPolicy(.accessory)
-app.run()
+MainActor.assumeIsolated {
+    let app = NSApplication.shared
+    let delegate = AppDelegate()
+    app.delegate = delegate
+    app.setActivationPolicy(.accessory)
+    app.run()
+}

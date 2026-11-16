@@ -138,20 +138,42 @@ pub fn check_path(session: &Session, path: &str) -> Result<PathBuf, Error> {
             json!({"missing": ["fs:read"]}),
         ));
     }
-    let p = Path::new(path)
-        .canonicalize()
-        .map_err(|e| err("not_found", format!("{path}: {e}"), Value::Null))?;
-    let inside = session
+    let roots: Vec<PathBuf> = session
         .read_roots
         .iter()
         .filter_map(|r| r.canonicalize().ok())
-        .any(|r| p.starts_with(r));
-    if !inside {
-        return Err(err(
+        .collect();
+    let outside = || {
+        err(
             "unauthorized",
             format!("{path} is outside the read roots this host allows"),
             json!({"readRoots": session.read_roots}),
-        ));
+        )
+    };
+    // Resolve before judging. A path that cannot be resolved is judged on its
+    // nearest existing ancestor, so a path outside the roots is refused as
+    // unauthorized whether or not it exists, and its existence is not revealed.
+    let p = match Path::new(path).canonicalize() {
+        Ok(p) => p,
+        Err(e) => {
+            let mut anc = Path::new(path).parent();
+            let resolved = loop {
+                match anc {
+                    Some(a) if !a.as_os_str().is_empty() => match a.canonicalize() {
+                        Ok(r) => break Some(r),
+                        Err(_) => anc = a.parent(),
+                    },
+                    _ => break std::env::current_dir().ok(),
+                }
+            };
+            if !resolved.is_some_and(|r| roots.iter().any(|root| r.starts_with(root))) {
+                return Err(outside());
+            }
+            return Err(err("not_found", format!("{path}: {e}"), Value::Null));
+        }
+    };
+    if !roots.iter().any(|r| p.starts_with(r)) {
+        return Err(outside());
     }
     Ok(p)
 }
