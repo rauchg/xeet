@@ -1,0 +1,18 @@
+[package]
+name = "xeet-ocr"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "Local OCR as a vision.read provider: text, positions and confidence from an on-device engine (Tesseract here; Apple Vision through a helper executable), recorded as inference."
+
+[dependencies]
+xeet-engine = { path = "../xeet-engine" }
+xeet-artifact = { path = "../xeet-artifact" }
+xeet-capture = { path = "../xeet-capture" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[dev-dependencies]
+xeet-gateway = { path = "../xeet-gateway" }
+png = "0.18"

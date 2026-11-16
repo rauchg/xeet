@@ -84,7 +84,10 @@ and per-session authority that discovery never grants.
 `xeet gateway` adapts inputs to what a target model can consume: a text-only
 model gets a provenance-preserving text representation of an image beside the
 user's unchanged instruction, with inference marked as inference
-([`docs/GATEWAY.md`](docs/GATEWAY.md)). See [`docs/ARTIFACT.md`](docs/ARTIFACT.md).
+([`docs/GATEWAY.md`](docs/GATEWAY.md)).
+`xeet capture` makes a screenshot a durable artifact and reads its text on the
+device (local OCR as inference); `apps/macos` is the menu-bar capture app
+(unverified: written without a Mac) ([`docs/CAPTURE.md`](docs/CAPTURE.md)). See [`docs/ARTIFACT.md`](docs/ARTIFACT.md).
 
 ## Running it
 

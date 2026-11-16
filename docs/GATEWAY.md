@@ -91,7 +91,7 @@ ELEMENTS
       reading.INV-1041 group vision.table-row "INV-1041 · Northwind Traders · $1,200.00 · due 2026-10-01 · status: Overdue" !inferred @v0(16,146 448x34) {"vision.confidence":0.96,…}
       reading.INV-1045 group vision.table-row "… · status: unreadable (cut off: \"Overd…\")" !inferred … {"vision.confidence":0.55,"vision.uncertain":"the status text is cut off …"}
 LIMITATIONS
-  inferred [reading.INV-1041] "content read from pixels, not supplied by the source" — "read by test-vision-reader 0.0.1 (…) at …"
+  inferred [reading.INV-1041] "content read from pixels, not supplied by the source" — "read by test-harness:hand-authored-reader 0.0.1 (…) at …"
 …
 ```
 
@@ -222,9 +222,15 @@ the provider sent only (the `_recorded` notes are stripped first).
 | live run 1, end to end (ingest, real vision read, text model answer) | 18.4 s |
 | live runs 2, 4, 5 (reading reused; fallback included in 2 and 4) | 1.8–4.3 s |
 
+## Capture
+
+Screenshots enter through the same derive path (`Gateway::derive`), with local
+OCR as a `vision.read` provider; reuse is by input digest, capture context and
+reader identity. See [`CAPTURE.md`](CAPTURE.md).
+
 ## Not done
 
-- One real reader: `ModelReader` over an OpenAI-compatible endpoint. Any other
+- Readers: local OCR (`xeet-ocr`, Tesseract verified; Apple Vision helper unverified) and `ModelReader` over an OpenAI-compatible endpoint. Any other
   provider declaring `vision.read` is used without gateway changes.
 - Ingest supports images only; PDFs, audio and video are reported as not
   deliverable (several gateway models accept them natively; the gateway

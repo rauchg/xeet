@@ -78,7 +78,7 @@ fn a_text_only_model_answers_from_an_injected_representation_of_a_screenshot() {
     let read = &part.steps[3];
     assert_eq!(
         read.selected.as_ref().unwrap().provider,
-        "test-vision-reader"
+        "test-harness:hand-authored-reader"
     );
     assert!(run.record.attempts[0]
         .prepared
@@ -392,7 +392,10 @@ fn authority_stays_with_the_host() {
         .iter()
         .find(|s| s.purpose == "read")
         .unwrap();
-    assert_eq!(read.candidates[0].provider, "test-vision-reader");
+    assert_eq!(
+        read.candidates[0].provider,
+        "test-harness:hand-authored-reader"
+    );
     assert!(read.skipped[0]
         .1
         .contains("unauthorized: this session lacks vision:read"));

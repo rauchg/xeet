@@ -92,7 +92,7 @@ fn the_manifest_is_complete_consistent_and_committed() {
             "{required}"
         );
     }
-    assert_eq!(m.sources.len(), 3);
+    assert_eq!(m.sources.len(), 4);
     // The committed manifest is what this build serves: a contract change is a reviewable diff.
     let committed: Value =
         serde_json::from_slice(&std::fs::read(root().join("docs/engine.manifest.json")).unwrap())

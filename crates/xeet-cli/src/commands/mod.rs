@@ -19,6 +19,7 @@
 //! | 5 | could not read or write a file |
 
 pub mod artifact;
+pub mod capture;
 pub mod engine;
 pub mod explain;
 pub mod gateway;
@@ -43,7 +44,7 @@ pub const EXIT_IO: u8 = 5;
 
 /// The commands this module implements, in the order `--help` lists them.
 pub const COMMANDS: &[&str] = &[
-    "render", "explain", "sheet", "resolve", "serve", "artifact", "engine", "gateway",
+    "render", "explain", "sheet", "resolve", "serve", "artifact", "engine", "gateway", "capture",
 ];
 
 /// True when `name` is one of [`COMMANDS`].
@@ -165,6 +166,8 @@ pub fn dispatch(name: &str, args: &[String]) -> u8 {
         "engine" => engine::run(args),
         // The modality gateway: model-consumable requests from any input.
         "gateway" => gateway::run(args),
+        // Screenshots: durable artifact + local OCR, the native app's entry point.
+        "capture" => capture::run(args),
         _ => {
             eprintln!("xeet: unknown command `{name}`");
             eprintln!("{}", usage_for("xeet"));
@@ -230,6 +233,7 @@ serve --stdio:                        one JSON request per line, one JSON reply 
 {artifact}
 {engine}
 {gateway}
+{capture}
 
 Any command: --limits standard|unlimited (default standard), --help.
 
@@ -245,6 +249,11 @@ Exit codes: 0 ok, 2 usage, 3 invalid input, 4 render failed, 5 I/O.",
             .collect::<Vec<_>>()
             .join("\n"),
         gateway = gateway::USAGE
+            .lines()
+            .map(|l| format!("{prog} {l}"))
+            .collect::<Vec<_>>()
+            .join("\n"),
+        capture = capture::USAGE
             .lines()
             .map(|l| format!("{prog} {l}"))
             .collect::<Vec<_>>()

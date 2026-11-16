@@ -60,7 +60,7 @@ pub struct TestReader {
 impl TestReader {
     pub fn new() -> TestReader {
         let mut manifest = contract::manifest();
-        manifest.provider.id = "test-vision-reader".into();
+        manifest.provider.id = "test-harness:hand-authored-reader".into();
         manifest.provider.name =
             "Test vision reader (HARNESS: returns a hand-authored reading)".into();
         manifest.provider.version = "0.0.1".into();
@@ -109,7 +109,7 @@ fn outcome(cap: &str, input: &Value, result: Result<Value, Value>) -> Outcome {
     Outcome {
         capability: cap.into(),
         version: "0.1".into(),
-        provider: "test-vision-reader".into(),
+        provider: "test-harness:hand-authored-reader".into(),
         provider_version: "0.0.1".into(),
         ok,
         result_digest: result.as_ref().map(digest),
@@ -167,7 +167,7 @@ impl Provider for TestReader {
         };
         let annotation = json!({
             "parent": input["parent"], "elements": elements, "facts": facts,
-            "by": {"name": "test-vision-reader", "version": "0.0.1"},
+            "by": {"name": "test-harness:hand-authored-reader", "version": "0.0.1"},
             "method": "harness: hand-authored reading keyed by image digest", "at": T,
         });
         outcome(cap, input, Ok(json!({"annotation": annotation})))

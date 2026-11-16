@@ -118,7 +118,15 @@ pub fn annotate(package: &Package, ann: &Annotation) -> Result<Package, String> 
             "content read from pixels, not supplied by the source",
             why.clone(),
         ));
-        a.semantic.elements.push(e.clone());
+        // Bounds are quantized to 1/64 layout unit, as every producer's are,
+        // so they survive any JSON round trip and identity stays stable.
+        let mut e = e.clone();
+        for b in &mut e.bounds {
+            for v in [&mut b.x, &mut b.y, &mut b.w, &mut b.h] {
+                *v = (*v * 64.0).round() / 64.0;
+            }
+        }
+        a.semantic.elements.push(e);
     }
     for f in &ann.facts {
         a.limitations.inferred.push(Note::new(

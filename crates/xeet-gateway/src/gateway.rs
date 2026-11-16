@@ -495,7 +495,7 @@ impl<'a> Gateway<'a> {
                 parts.push(rec);
                 continue;
             }
-            self.represent(input, &insp, &mut rec, session, now);
+            self.represent(input, &insp, &mut rec, session, now, None);
             parts.push(rec);
         }
 
@@ -655,7 +655,29 @@ impl<'a> Gateway<'a> {
         }
     }
 
+    /// Readers (`vision.read` providers) for this media type that the session
+    /// authorizes, as `provider@version` — the identity a reading carries.
+    fn readers(&self, mt: &str, session: &Session) -> Vec<String> {
+        self.providers
+            .iter()
+            .filter_map(|p| {
+                let m = p.manifest();
+                let c = m.capabilities.iter().find(|c| c.id == "vision.read")?;
+                (c.input_modalities.iter().any(|x| x == mt)
+                    && missing_scopes(c, session).is_empty())
+                .then(|| format!("{}@{}", m.provider.id, m.provider.version))
+            })
+            .collect()
+    }
+
     /// Reuse, or ingest + read + annotate, for one input the model cannot take.
+    ///
+    /// Reuse is by content and by reader identity: a reading made by an
+    /// available reader with the same id and version (which for local OCR
+    /// includes its engine and configuration) is reused as is; otherwise the
+    /// bare ingested artifact is reused and only the reading runs. With a
+    /// capture context, only artifacts from the same pixels *and* the same
+    /// context are the same observation.
     fn represent(
         &self,
         input: &Input,
@@ -663,11 +685,15 @@ impl<'a> Gateway<'a> {
         rec: &mut PartRecord,
         session: &Session,
         now: &str,
+        context: Option<&Value>,
     ) {
         rec.decision = "represent".into();
         let mt = insp.media_type.clone();
+        let readers = self.readers(&mt, session);
+        let context_digest = context.map(|c| canon::sha256_id(canon::canonical(c).as_bytes()));
 
-        // 1. Reuse: an artifact already made from the same bytes.
+        // 1. Reuse.
+        let mut base: Option<String> = None;
         let (step, found) = self.call(
             "reuse",
             "representation.retrieve",
@@ -675,40 +701,91 @@ impl<'a> Gateway<'a> {
                 has: vec![modality::JSON.into()],
                 ..Query::default()
             },
-            |_| json!({"inputDigest": insp.digest, "limit": 50}),
+            |_| json!({"inputDigest": insp.digest, "limit": 200}),
             |_| None,
             session,
         );
         rec.steps.push(step);
         if let Some((o, pi)) = found {
-            let list = o
+            let list: Vec<Value> = o
                 .result
                 .as_ref()
                 .and_then(|r| r["artifacts"].as_array().cloned())
                 .unwrap_or_default();
-            // Prefer one that carries a reading, then the newest capture.
-            let best = list.iter().max_by(|a, b| {
-                a["inferred"]
-                    .as_u64()
-                    .cmp(&b["inferred"].as_u64())
-                    .then(a["capturedAt"].as_str().cmp(&b["capturedAt"].as_str()))
-                    .then(b["id"].as_str().cmp(&a["id"].as_str()))
-            });
-            if let Some(b) = best {
-                let id = b["id"].as_str().unwrap_or("").to_string();
+            let same_observation = |a: &&Value| {
+                let inputs: Vec<&str> = a["inputs"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .filter_map(Value::as_str)
+                    .collect();
+                match &context_digest {
+                    Some(d) => inputs.contains(&d.as_str()),
+                    None => inputs.len() == 1,
+                }
+            };
+            let newest = |xs: Vec<&Value>| -> Option<Value> {
+                xs.into_iter()
+                    .max_by(|a, b| {
+                        a["capturedAt"]
+                            .as_str()
+                            .cmp(&b["capturedAt"].as_str())
+                            .then(b["id"].as_str().cmp(&a["id"].as_str()))
+                    })
+                    .cloned()
+            };
+            let annotated_by = |a: &Value, ids: &[String]| {
+                a["annotatedBy"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .filter_map(Value::as_str)
+                    .any(|x| ids.iter().any(|r| r == x))
+            };
+            let pool: Vec<&Value> = list.iter().filter(same_observation).collect();
+            let by_available = newest(
+                pool.iter()
+                    .copied()
+                    .filter(|a| annotated_by(a, &readers))
+                    .collect(),
+            );
+            let any_reading = newest(
+                pool.iter()
+                    .copied()
+                    .filter(|a| a["inferred"].as_u64().unwrap_or(0) > 0)
+                    .collect(),
+            );
+            let bare = newest(
+                pool.iter()
+                    .copied()
+                    .filter(|a| {
+                        a["inferred"].as_u64().unwrap_or(0) == 0 && a["derivedFrom"].is_null()
+                    })
+                    .collect(),
+            );
+            let (choice, finished) = match (&by_available, readers.is_empty()) {
+                (Some(a), _) => (Some(a.clone()), true),
+                (None, false) => (bare.clone(), false),
+                (None, true) => (any_reading.clone().or(bare.clone()), true),
+            };
+            if let Some(a) = choice {
+                let id = a["id"].as_str().unwrap_or("").to_string();
                 let v = self.validate(pi, &id, session);
                 let ok = v.ok;
                 rec.steps.push(v);
                 if ok {
-                    rec.artifact = Some(store::uri(&id));
                     rec.reused = true;
-                    rec.content_read = b["inferred"].as_u64().unwrap_or(0) > 0;
-                    return;
+                    if finished {
+                        rec.artifact = Some(store::uri(&id));
+                        rec.content_read = a["inferred"].as_u64().unwrap_or(0) > 0;
+                        return;
+                    }
+                    base = Some(id);
                 }
             }
         }
 
-        // 2. Ingest: a provider that represents this modality as an artifact.
+        // 2. Ingest, unless a bare artifact for this observation was reused.
         let raw = match input {
             Input::Path(_) => None,
             _ => self.bytes_of(input, session).ok(),
@@ -717,73 +794,75 @@ impl<'a> Gateway<'a> {
             Input::Path(p) => Some(p.to_string_lossy().to_string()),
             _ => None,
         };
-        let (step, made) = self.call(
-            "ingest",
-            "representation.capture",
-            Query {
-                outcome: Some(format!("represent an {} file", insp.class_name())),
-                has: vec![mt.clone()],
-                accepts: vec![modality::ARTIFACT.into(), modality::JSON.into()],
-                ..Query::default()
-            },
-            |_| {
-                let mut v =
-                    json!({"source": "image", "capturedAt": now, "method": "modality-gateway"});
-                match (&path, &raw) {
-                    (Some(p), _) => v["path"] = json!(p),
-                    (None, Some(b)) => v["dataBase64"] = json!(xeet_engine::b64(b)),
-                    _ => {}
+        let mut id = match base {
+            Some(id) => id,
+            None => {
+                let source = if context.is_some() {
+                    "screenshot"
+                } else {
+                    "image"
+                };
+                let (step, made) = self.call(
+                    "ingest",
+                    "representation.capture",
+                    Query { outcome: Some(format!("represent an {} file", insp.class_name())), has: vec![mt.clone()], accepts: vec![modality::ARTIFACT.into(), modality::JSON.into()], ..Query::default() },
+                    |_| {
+                        let mut v = json!({"source": source, "capturedAt": now, "method": "modality-gateway"});
+                        match (&path, &raw) {
+                            (Some(p), _) => v["path"] = json!(p),
+                            (None, Some(b)) => v["dataBase64"] = json!(xeet_engine::b64(b)),
+                            _ => {}
+                        }
+                        if let Some(n) = &insp.declared_name {
+                            v["name"] = json!(n);
+                        }
+                        if let Some(t) = &insp.declared_type {
+                            v["declaredType"] = json!(t);
+                        }
+                        if let Some(c) = context {
+                            v["context"] = c.clone();
+                        }
+                        v
+                    },
+                    |p| {
+                        (!p.manifest().sources.iter().any(|s| s.kind == "image") || insp.class != Class::Image)
+                            .then(|| format!("{} has no source adapter for {mt}", p.manifest().provider.id))
+                    },
+                    session,
+                );
+                let failed = step.error.clone();
+                rec.steps.push(step);
+                let Some((o, pi)) = made else {
+                    rec.decision = "unavailable".into();
+                    rec.reason = format!(
+                        "{}; {}",
+                        rec.reason,
+                        failed
+                            .and_then(|e| e["message"].as_str().map(str::to_string))
+                            .unwrap_or_else(|| "ingest failed".into())
+                    );
+                    return;
+                };
+                let id = o
+                    .result
+                    .as_ref()
+                    .and_then(|r| r["id"].as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let v = self.validate(pi, &id, session);
+                let ok = v.ok;
+                rec.steps.push(v);
+                if !ok {
+                    rec.decision = "unavailable".into();
+                    rec.reason = format!(
+                        "{}; the ingested artifact failed digest validation",
+                        rec.reason
+                    );
+                    return;
                 }
-                if let Some(n) = &insp.declared_name {
-                    v["name"] = json!(n);
-                }
-                if let Some(t) = &insp.declared_type {
-                    v["declaredType"] = json!(t);
-                }
-                v
-            },
-            |p| {
-                (!p.manifest().sources.iter().any(|s| s.kind == "image")
-                    || insp.class != Class::Image)
-                    .then(|| {
-                        format!(
-                            "{} has no source adapter for {mt}",
-                            p.manifest().provider.id
-                        )
-                    })
-            },
-            session,
-        );
-        let failed = step.error.clone();
-        rec.steps.push(step);
-        let Some((o, pi)) = made else {
-            rec.decision = "unavailable".into();
-            rec.reason = format!(
-                "{}; {}",
-                rec.reason,
-                failed
-                    .and_then(|e| e["message"].as_str().map(str::to_string))
-                    .unwrap_or_else(|| "ingest failed".into())
-            );
-            return;
+                id
+            }
         };
-        let mut id = o
-            .result
-            .as_ref()
-            .and_then(|r| r["id"].as_str())
-            .unwrap_or("")
-            .to_string();
-        let v = self.validate(pi, &id, session);
-        let ok = v.ok;
-        rec.steps.push(v);
-        if !ok {
-            rec.decision = "unavailable".into();
-            rec.reason = format!(
-                "{}; the ingested artifact failed digest validation",
-                rec.reason
-            );
-            return;
-        }
 
         // 3. Read: any provider of vision.read for this modality. Optional.
         let bytes = raw
@@ -802,7 +881,8 @@ impl<'a> Gateway<'a> {
         rec.steps.push(step);
         if let Some((o, _)) = read {
             if let Some(annotation) = o.result.as_ref().and_then(|r| r.get("annotation")).cloned() {
-                // 4. Annotate: the reading enters only as declared inference.
+                // 4. Annotate: the reading enters only as declared inference,
+                // in a new artifact derived from the original.
                 let (step, ann) = self.call(
                     "annotate",
                     "representation.annotate",
@@ -832,6 +912,59 @@ impl<'a> Gateway<'a> {
             }
         }
         rec.artifact = Some(store::uri(&id));
+    }
+
+    /// The capture path: makes (or reuses) the artifact for one input and
+    /// reads it with any authorized reader, without any model involved.
+    /// `context` is a screenshot's capture context.
+    pub fn derive(
+        &self,
+        input: &Input,
+        session: &Session,
+        now: &str,
+        context: Option<&Value>,
+    ) -> PartRecord {
+        let mut rec = PartRecord {
+            inspection: Inspection {
+                index: 0,
+                origin: "unreadable".into(),
+                class: Class::Unknown,
+                media_type: "application/octet-stream".into(),
+                declared_type: None,
+                declared_name: None,
+                declared_mismatch: false,
+                bytes: 0,
+                digest: String::new(),
+                dimensions: None,
+            },
+            acceptance: Acceptance::Unknown {
+                reason: "capture: no model profile".into(),
+            },
+            decision: String::new(),
+            reason: "capture".into(),
+            steps: vec![],
+            artifact: None,
+            reused: false,
+            delivery: None,
+            budget_chars: None,
+            content_read: false,
+        };
+        match inspect(0, input, session) {
+            Ok(i) if i.class == Class::Image => {
+                rec.inspection = i.clone();
+                self.represent(input, &i, &mut rec, session, now, context);
+            }
+            Ok(i) => {
+                rec.reason = format!("capture takes images; this is {}", i.media_type);
+                rec.inspection = i;
+                rec.decision = "unavailable".into();
+            }
+            Err(e) => {
+                rec.decision = "unavailable".into();
+                rec.reason = format!("{}: {}", e.code, e.message);
+            }
+        }
+        rec
     }
 
     /// Prepares, sends, and on a confirmed modality rejection re-prepares

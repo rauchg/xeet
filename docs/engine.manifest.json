@@ -60,6 +60,14 @@
             "description": "ISO 8601 observation time; defaults to the host clock",
             "type": "string"
           },
+          "context": {
+            "description": "screenshot: the capture context (method, mode, platform, display, frame, window, permissions, accessibility tree); see xeet_capture::image::CaptureContext",
+            "required": [
+              "method",
+              "mode"
+            ],
+            "type": "object"
+          },
           "data": {
             "description": "x.post: a model::Post or `xeet resolve` output; github.pull_request: {pull, reviews?, comments?, files?, commits?, apiVersion?} of REST responses",
             "type": "object"
@@ -124,7 +132,8 @@
             "enum": [
               "x.post",
               "github.pull_request",
-              "image"
+              "image",
+              "screenshot"
             ]
           },
           "sourceId": {
@@ -138,7 +147,7 @@
         "type": "object"
       },
       "limitations": [
-        "three source types today: x.post, github.pull_request, image",
+        "four source types today: x.post, github.pull_request, image, screenshot",
         "image: identifies format and dimensions and keeps the bytes; does NOT read the content (visual-only until annotated)",
         "no network: source data must be supplied",
         "authenticity of the source data is recorded as unverified"
@@ -1320,8 +1329,8 @@
     }
   ],
   "limitations": [
-    "three source types; images are identified and measured, not interpreted",
-    "no OCR or image interpretation",
+    "four source types; images and screenshots are identified and measured by the engine, not interpreted",
+    "the engine itself does no OCR or image interpretation (local OCR is the separate xeet-ocr provider, behind the ocr:local scope)",
     "no network",
     "artifact authenticity is always unverified",
     "discovery matches declared outcomes by keywords, not by meaning"
@@ -1406,6 +1415,26 @@
       ],
       "type": "image",
       "visualFidelity": "original: the view is the source bytes"
+    },
+    {
+      "adapter": "xeet-capture/image",
+      "adapterVersion": "0.1.0",
+      "coverage": {
+        "bounds": "partial",
+        "capabilities": "not-applicable",
+        "provenance": "supported",
+        "reproduction": "supported",
+        "semantic": "partial",
+        "state": "partial",
+        "visual": "supported"
+      },
+      "input": "image bytes plus the capturing application's context (xeet_capture::image::CaptureContext): method, mode, platform, display, captured frame, window and app identity, permissions, optional accessibility tree",
+      "notes": [
+        "context is observed by the capturing app; the accessibility tree is a separate source (what the app reports); missing permissions are recorded as omissions",
+        "text in the pixels is added only by a vision.read provider, as inference"
+      ],
+      "type": "screenshot",
+      "visualFidelity": "original: the view is the captured bytes"
     },
     {
       "adapter": "xeet-capture/github",

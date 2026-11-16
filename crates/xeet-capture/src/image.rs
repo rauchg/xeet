@@ -106,6 +106,276 @@ pub struct Capture<'a> {
     pub declared_name: Option<String>,
     /// A media type the caller declared. Recorded and compared, not trusted.
     pub declared_type: Option<String>,
+    /// For screenshots: the capture context JSON ([`CaptureContext`]) from the
+    /// capturing application, preserved verbatim as a second input.
+    pub context: Option<&'a [u8]>,
+}
+
+pub const CONTEXT_ROLE: &str = "capture-context";
+
+/// What a capturing application observed alongside the pixels. Every field is
+/// optional except `method` and `mode`: unknown is recorded as unknown.
+#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct CaptureContext {
+    /// The capturing application, e.g. `{"name": "Xeet Capture", "version": "0.1.0"}`.
+    pub captured_by: Option<Tool>,
+    /// `screencapturekit`, `screencapture-cli`, …
+    pub method: String,
+    /// `display`, `region` or `window`.
+    pub mode: String,
+    /// e.g. `macOS 15.1 (24B83)`.
+    pub platform: Option<String>,
+    pub display: Option<Display>,
+    /// The captured rectangle in global points (all modes).
+    pub frame: Option<[f64; 4]>,
+    pub window: Option<Window>,
+    pub frontmost_app: Option<App>,
+    /// `screenRecording`, `accessibility` → `granted`, `denied`, `not-requested`, `unknown`.
+    pub permissions: std::collections::BTreeMap<String, String>,
+    /// The accessibility tree of the captured window, frames in global points.
+    pub accessibility: Option<AxNode>,
+    pub notes: Vec<String>,
+}
+
+#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct Display {
+    pub id: u64,
+    pub name: Option<String>,
+    /// Global points.
+    pub frame: [f64; 4],
+    /// Pixels per point (2 on Retina).
+    pub scale: f64,
+}
+
+#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct Window {
+    pub id: u64,
+    pub title: Option<String>,
+    pub app: Option<App>,
+    /// Global points.
+    pub frame: [f64; 4],
+}
+
+#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct App {
+    pub name: Option<String>,
+    pub bundle_id: Option<String>,
+    pub pid: Option<i64>,
+}
+
+#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct AxNode {
+    pub role: String,
+    pub subrole: Option<String>,
+    pub title: Option<String>,
+    pub label: Option<String>,
+    pub value: Option<String>,
+    /// Global points.
+    pub frame: Option<[f64; 4]>,
+    pub children: Vec<AxNode>,
+}
+
+/// Accessibility nodes kept per capture; the rest are counted as omitted.
+pub const AX_LIMIT: usize = 1500;
+
+fn ax_kind(role: &str) -> &'static str {
+    match role {
+        "AXButton" | "AXMenuItem" | "AXMenuButton" | "AXLink" | "AXCheckBox" | "AXRadioButton"
+        | "AXPopUpButton" | "AXTab" | "AXSlider" => "affordance",
+        "AXStaticText" | "AXTextField" | "AXTextArea" | "AXSearchField" | "AXCell" => "text",
+        "AXImage" => "media",
+        "AXHeading" => "heading",
+        "AXList" | "AXTable" | "AXOutline" => "list",
+        _ => "group",
+    }
+}
+
+/// Maps capture context onto the artifact: identity and geometry as
+/// observations of the capturing app, the accessibility tree as a separate
+/// source, permissions as facts, and every gap as a stated omission.
+fn apply_context(
+    ctx: &CaptureContext,
+    img: (u32, u32),
+    root: &mut Element,
+    elements: &mut Vec<Element>,
+    facts: &mut Vec<Fact>,
+    lim: &mut Limitations,
+) -> String {
+    let observed = |id: &str, kind: &str, role: &str| {
+        let mut e = el(id, kind, role);
+        e.basis = Basis::Observed;
+        e.visible = false;
+        e
+    };
+    root.attrs.insert("capture.mode".into(), json!(ctx.mode));
+    root.attrs
+        .insert("capture.method".into(), json!(ctx.method));
+    if let Some(f) = ctx.frame {
+        root.attrs.insert("capture.frame".into(), json!(f));
+    }
+    facts.push(fact(
+        "image",
+        "captureMode",
+        json!(ctx.mode),
+        Basis::Observed,
+        false,
+    ));
+    facts.push(fact(
+        "image",
+        "platform",
+        json!(ctx.platform),
+        Basis::Observed,
+        false,
+    ));
+    for (k, v) in &ctx.permissions {
+        facts.push(fact(
+            "image",
+            &format!("permission.{k}"),
+            json!(v),
+            Basis::Observed,
+            true,
+        ));
+    }
+    let mut title = String::new();
+    if let Some(d) = &ctx.display {
+        let mut e = observed("capture.display", "group", "capture.display");
+        e.text = d.name.clone();
+        e.attrs.insert("capture.displayId".into(), json!(d.id));
+        e.attrs
+            .insert("capture.displayFrame".into(), json!(d.frame));
+        e.attrs.insert("capture.scale".into(), json!(d.scale));
+        root.children.push(e.id.clone());
+        elements.push(e);
+        title = d
+            .name
+            .clone()
+            .unwrap_or_else(|| format!("display {}", d.id));
+    }
+    if let Some(w) = &ctx.window {
+        let mut e = observed("capture.window", "identity", "capture.window");
+        e.text = w.title.clone();
+        e.attrs.insert("capture.windowId".into(), json!(w.id));
+        e.attrs.insert("capture.windowFrame".into(), json!(w.frame));
+        if let Some(a) = &w.app {
+            e.attrs
+                .insert("capture.app".into(), serde_json::to_value(a).unwrap());
+        }
+        root.children.push(e.id.clone());
+        elements.push(e);
+        title = format!(
+            "{}{}",
+            w.app
+                .as_ref()
+                .and_then(|a| a.name.clone())
+                .map(|n| format!("{n}: "))
+                .unwrap_or_default(),
+            w.title.clone().unwrap_or_else(|| "untitled window".into())
+        );
+    }
+    if let Some(a) = &ctx.frontmost_app {
+        root.attrs.insert(
+            "capture.frontmostApp".into(),
+            serde_json::to_value(a).unwrap(),
+        );
+    }
+    if ctx.window.as_ref().is_some_and(|w| w.title.is_none()) {
+        lim.omitted.push(Note::new(Some("capture.window"), "window title", "not reported by the platform (it needs screen-recording permission, or the window has none)"));
+    }
+
+    // Accessibility: a separate source of evidence from the pixels.
+    let ax = ctx
+        .permissions
+        .get("accessibility")
+        .map(String::as_str)
+        .unwrap_or("unknown");
+    match (&ctx.accessibility, ax) {
+        (Some(tree), _) => {
+            let (ox, oy) = ctx.frame.map(|f| (f[0], f[1])).unwrap_or((0.0, 0.0));
+            let scale = ctx.display.as_ref().map(|d| d.scale).filter(|s| *s > 0.0).unwrap_or(1.0);
+            let mut count = 0usize;
+            let mut omitted = 0usize;
+            let mut stack = vec![(tree, "ax".to_string(), None::<String>)];
+            while let Some((n, id, parent)) = stack.pop() {
+                if count >= AX_LIMIT {
+                    omitted += 1;
+                    stack.extend(n.children.iter().map(|c| (c, String::new(), None)));
+                    continue;
+                }
+                count += 1;
+                let mut e = el(&id, ax_kind(&n.role), &format!("ax.{}", n.role.trim_start_matches("AX")));
+                e.basis = Basis::Source;
+                let text: Vec<&str> = [n.title.as_deref(), n.label.as_deref()].into_iter().flatten().filter(|t| !t.is_empty()).collect();
+                if !text.is_empty() {
+                    e.text = Some(text.join(" — "));
+                }
+                if let Some(v) = n.value.as_deref().filter(|v| !v.is_empty()) {
+                    e.value = Some(json!(v));
+                }
+                e.attrs.insert("ax.role".into(), json!(n.role));
+                if let Some(sr) = &n.subrole {
+                    e.attrs.insert("ax.subrole".into(), json!(sr));
+                }
+                e.visible = false;
+                if let Some(f) = n.frame {
+                    e.attrs.insert("ax.frame".into(), json!(f));
+                    // Global points → image pixels; clipped to the image.
+                    let (x0, y0) = ((f[0] - ox) * scale, (f[1] - oy) * scale);
+                    let (x1, y1) = (x0 + f[2] * scale, y0 + f[3] * scale);
+                    let (cx0, cy0, cx1, cy1) = (x0.max(0.0), y0.max(0.0), x1.min(img.0 as f64), y1.min(img.1 as f64));
+                    if cx1 > cx0 && cy1 > cy0 {
+                        e.visible = true;
+                        let q = |v: f64| ((v * 64.0).round() / 64.0) as f32;
+                        e.bounds.push(Bounds { view: VIEW.into(), x: q(cx0), y: q(cy0), w: q(cx1 - cx0), h: q(cy1 - cy0) });
+                        if (cx0, cy0, cx1, cy1) != (x0, y0, x1, y1) {
+                            e.attrs.insert("ax.clipped".into(), json!(true));
+                        }
+                    }
+                }
+                for (i, c) in n.children.iter().enumerate() {
+                    stack.push((c, format!("{id}.{i}"), Some(id.clone())));
+                }
+                match parent {
+                    Some(p) => {
+                        if let Some(pe) = elements.iter_mut().find(|x| x.id == p) {
+                            pe.children.push(id.clone());
+                        }
+                    }
+                    None => root.children.push(id.clone()),
+                }
+                elements.push(e);
+            }
+            // Children were pushed in reverse; keep document order.
+            for e in elements.iter_mut().filter(|e| e.id.starts_with("ax")) {
+                e.children.sort_by_key(|a| natural(a));
+            }
+            lim.unverified.push(Note::new(Some("ax"), "the accessibility tree", "it is what the application reported through the platform's accessibility API, a separate source from the pixels; the two can disagree"));
+            if omitted > 0 {
+                lim.omitted.push(Note::new(Some("ax"), format!("{omitted} accessibility nodes"), format!("more than {AX_LIMIT} nodes")));
+            }
+        }
+        (None, "granted") => lim.omitted.push(Note::new(Some("image"), "the accessibility tree", "accessibility permission was granted but no tree was captured (the window exposes none, or capture mode is not window)")),
+        (None, status) => lim.omitted.push(Note::new(Some("image"), "the accessibility tree", format!("accessibility permission: {status}"))),
+    }
+    for n in &ctx.notes {
+        lim.unverified.push(Note::new(
+            None,
+            n.clone(),
+            "reported by the capturing application",
+        ));
+    }
+    if title.is_empty() {
+        title = format!("{} capture", ctx.mode);
+    }
+    format!("screenshot of {title} ({}x{})", img.0, img.1)
+}
+
+fn natural(id: &str) -> Vec<u64> {
+    id.split('.').filter_map(|p| p.parse().ok()).collect()
 }
 
 pub fn capture(c: &Capture) -> Result<Package, String> {
@@ -140,10 +410,26 @@ pub fn capture(c: &Capture) -> Result<Package, String> {
     }
 
     let mut lim = Limitations::default();
+    let mut extra: Vec<Element> = Vec::new();
+    let mut context_facts: Vec<Fact> = Vec::new();
+    let ctx: Option<CaptureContext> = match c.context {
+        Some(b) => Some(serde_json::from_slice(b).map_err(|e| format!("capture context: {e}"))?),
+        None => None,
+    };
+    let screenshot_title = ctx.as_ref().map(|x| {
+        apply_context(
+            x,
+            (s.width, s.height),
+            &mut root,
+            &mut extra,
+            &mut context_facts,
+            &mut lim,
+        )
+    });
     lim.omitted.push(Note::new(
         Some("image"),
-        "the image's content: text, objects, values, layout",
-        "this adapter identifies and measures images; it does not interpret pixels. Content stays visual-only until a reader annotates it, as inference",
+        "the image's content (text, objects, values, layout) as fact",
+        "this adapter identifies and measures images and does not interpret pixels; a reader (OCR, a vision model) may add text and positions, always as inference (see limitations.inferred)",
     ));
     if let Some(t) = &c.declared_type {
         if t != s.media_type {
@@ -160,7 +446,7 @@ pub fn capture(c: &Capture) -> Result<Package, String> {
         "the caller supplied the bytes; their origin is not established",
     ));
 
-    let facts = vec![
+    let mut facts = vec![
         fact("image", "sha256", json!(sha), Basis::Observed, false),
         fact(
             "image",
@@ -177,6 +463,19 @@ pub fn capture(c: &Capture) -> Result<Package, String> {
             false,
         ),
     ];
+    facts.extend(context_facts);
+    let mut inputs = vec![AssetUse {
+        asset: sha.clone(),
+        role: INPUT_ROLE.into(),
+    }];
+    if let Some(b) = c.context {
+        inputs.push(AssetUse {
+            asset: store.add(b.to_vec(), "application/json"),
+            role: CONTEXT_ROLE.into(),
+        });
+    }
+    let mut all = vec![root];
+    all.extend(extra);
     let renderer = Tool {
         name: "none: the view is the source bytes".into(),
         version: String::new(),
@@ -187,35 +486,49 @@ pub fn capture(c: &Capture) -> Result<Package, String> {
         format_version: FORMAT_VERSION.into(),
         id: String::new(),
         subject: Subject {
-            kind: "image".into(),
+            kind: if ctx.is_some() {
+                "screenshot".into()
+            } else {
+                "image".into()
+            },
             reference: None,
-            title: format!(
-                "{} {}x{}{}",
-                s.media_type,
-                s.width,
-                s.height,
-                c.declared_name
-                    .as_deref()
-                    .map(|n| format!(" ({n})"))
-                    .unwrap_or_default()
-            ),
+            title: screenshot_title.clone().unwrap_or_else(|| {
+                format!(
+                    "{} {}x{}{}",
+                    s.media_type,
+                    s.width,
+                    s.height,
+                    c.declared_name
+                        .as_deref()
+                        .map(|n| format!(" ({n})"))
+                        .unwrap_or_default()
+                )
+            }),
             element: "image".into(),
         },
         provenance: Provenance {
             source: SourceRef {
-                kind: "file".into(),
+                kind: if ctx.is_some() {
+                    "screen".into()
+                } else {
+                    "file".into()
+                },
+                version: ctx.as_ref().and_then(|x| x.platform.clone()),
                 ..SourceRef::default()
             },
             capture: xeet_artifact::Capture {
                 captured_at: c.captured_at.clone(),
-                method: c.method.clone(),
-                captured_by: tool("image"),
+                method: ctx
+                    .as_ref()
+                    .map(|x| x.method.clone())
+                    .unwrap_or_else(|| c.method.clone()),
+                captured_by: ctx
+                    .as_ref()
+                    .and_then(|x| x.captured_by.clone())
+                    .unwrap_or_else(|| tool("image")),
             },
             adapter: tool("image"),
-            inputs: vec![AssetUse {
-                asset: sha.clone(),
-                role: INPUT_ROLE.into(),
-            }],
+            inputs,
             transformations: vec![Transformation {
                 step: "identify-and-measure (magic bytes, header dimensions)".into(),
                 tool: tool("image"),
@@ -246,7 +559,7 @@ pub fn capture(c: &Capture) -> Result<Package, String> {
         }],
         semantic: Semantic {
             root: "image".into(),
-            elements: vec![root],
+            elements: all,
             relations: vec![],
         },
         state: State {
@@ -322,6 +635,7 @@ mod tests {
             method: "fixture".into(),
             declared_name: Some("shot.jpg".into()),
             declared_type: Some("image/jpeg".into()),
+            context: None,
         })
         .unwrap();
         let v = verify::verify(&p, Some(&crate::Reproducers));

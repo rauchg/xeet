@@ -235,7 +235,8 @@ pub fn contracts() -> Vec<Contract> {
             input_modalities: s(&[JSON, PNG, "image/jpeg", "image/gif", "image/webp"]),
             modes: vec![Mode { output: s(&[ARTIFACT, JSON]), select: json!({}), note: "returns a reference; use representation.understand to read it".into() }],
             input_schema: json!({"type": "object", "additionalProperties": false, "required": ["source"], "properties": {
-                "source": {"enum": ["x.post", "github.pull_request", "image"]},
+                "source": {"enum": ["x.post", "github.pull_request", "image", "screenshot"]},
+                "context": {"type": "object", "description": "screenshot: the capture context (method, mode, platform, display, frame, window, permissions, accessibility tree); see xeet_capture::image::CaptureContext", "required": ["method", "mode"]},
                 "data": {"type": "object", "description": "x.post: a model::Post or `xeet resolve` output; github.pull_request: {pull, reviews?, comments?, files?, commits?, apiVersion?} of REST responses"},
                 "path": {"type": "string", "description": "a file with the same content, inside an allowed read root (needs fs:read)"},
                 "dataBase64": {"type": "string", "description": "image: the file's bytes, base64"},
@@ -252,7 +253,7 @@ pub fn contracts() -> Vec<Contract> {
             authority: s(&["store:write"]),
             preconditions: s(&["exactly one of data, dataBase64 or path", "path inputs also need fs:read and must lie inside an allowed read root"]),
             guarantees: s(&["the stored artifact passed verification, including reproduction of its view from the preserved input", "same input and capturedAt give the same artifact id", "source bytes are preserved verbatim in the artifact"]),
-            limitations: s(&["three source types today: x.post, github.pull_request, image", "image: identifies format and dimensions and keeps the bytes; does NOT read the content (visual-only until annotated)", "no network: source data must be supplied", "authenticity of the source data is recorded as unverified"]),
+            limitations: s(&["four source types today: x.post, github.pull_request, image, screenshot", "image: identifies format and dimensions and keeps the bytes; does NOT read the content (visual-only until annotated)", "no network: source data must be supplied", "authenticity of the source data is recorded as unverified"]),
             constraints: constraints(true, &["typical latency tens of milliseconds"]),
             errors: s(ERRORS_WRITE),
         },
@@ -523,6 +524,15 @@ pub fn manifest() -> Manifest {
                 notes: s(&["format, dimensions and digest only; the content is visual-only until a reader annotates it as inference"]),
             },
             SourceSupport {
+                kind: "screenshot".into(),
+                adapter: xeet_capture::image::ADAPTER.into(),
+                adapter_version: v.clone(),
+                input: "image bytes plus the capturing application's context (xeet_capture::image::CaptureContext): method, mode, platform, display, captured frame, window and app identity, permissions, optional accessibility tree".into(),
+                visual_fidelity: "original: the view is the captured bytes".into(),
+                coverage: cov(&[("visual", "supported"), ("semantic", "partial"), ("bounds", "partial"), ("provenance", "supported"), ("state", "partial"), ("capabilities", "not-applicable"), ("reproduction", "supported")]),
+                notes: s(&["context is observed by the capturing app; the accessibility tree is a separate source (what the app reports); missing permissions are recorded as omissions", "text in the pixels is added only by a vision.read provider, as inference"]),
+            },
+            SourceSupport {
                 kind: "github.pull_request".into(),
                 adapter: xeet_capture::github::ADAPTER.into(),
                 adapter_version: v.clone(),
@@ -550,7 +560,7 @@ pub fn manifest() -> Manifest {
                 alternative: "fetch with your own client (or `xeet resolve` for X), then representation.capture".into(),
             },
         ],
-        limitations: s(&["three source types; images are identified and measured, not interpreted", "no OCR or image interpretation", "no network", "artifact authenticity is always unverified", "discovery matches declared outcomes by keywords, not by meaning"]),
+        limitations: s(&["four source types; images and screenshots are identified and measured by the engine, not interpreted", "the engine itself does no OCR or image interpretation (local OCR is the separate xeet-ocr provider, behind the ocr:local scope)", "no network", "artifact authenticity is always unverified", "discovery matches declared outcomes by keywords, not by meaning"]),
         constraints: Constraints {
             network: "none".into(),
             deterministic: true,

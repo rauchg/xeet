@@ -487,3 +487,44 @@ fn an_agent_finds_and_uses_the_modality_gateway_over_mcp() {
     );
     let _ = std::fs::remove_dir_all(store);
 }
+
+#[test]
+fn xeet_capture_makes_an_artifact_and_reads_its_text_locally() {
+    let store = tmp("capture-store");
+    let dir = tmp("capture-in");
+    std::fs::create_dir_all(&dir).unwrap();
+    let png = dir.join("Screenshot.png");
+    std::fs::copy(root().join("tests/fixtures/gateway/invoices.png"), &png).unwrap();
+    let ctx = root().join("tests/fixtures/capture/context-region-retina.json");
+    let has_tesseract = Command::new("tesseract").arg("--version").output().is_ok();
+    let (code, out, err) = run(&["capture", "--image", png.to_str().unwrap(), "--context", ctx.to_str().unwrap(), "--store", store.to_str().unwrap(), "--ocr", "tesseract"]);
+    let report: serde_json::Value = serde_json::from_str(&out).unwrap_or_else(|_| panic!("{out}{err}"));
+    assert_eq!(code, 0, "{report}");
+    assert_eq!(report["format"], "xeet-capture.report");
+    assert!(report["artifact"].as_str().unwrap().starts_with("artifact://sha256/"));
+    assert_eq!(report["imageSize"], serde_json::json!([480, 356]));
+    assert!(!out.contains("INV-1041"), "no recognized text in the report");
+    if has_tesseract {
+        assert_eq!(report["textRead"], true, "{report}");
+        assert_eq!(report["ocr"]["provider"], "xeet-ocr:tesseract");
+        assert!(report["summary"]["ocrLines"].as_u64().unwrap() >= 10);
+        assert_eq!(report["summary"]["accessibilityNodes"], 3);
+    } else {
+        assert_eq!(report["textRead"], false);
+        assert!(report["notes"].as_array().unwrap().iter().any(|n| n.as_str().unwrap().contains("tesseract unavailable")));
+    }
+    // Again: reused, nothing re-read.
+    let (_, out, _) = run(&["capture", "--image", png.to_str().unwrap(), "--context", ctx.to_str().unwrap(), "--store", store.to_str().unwrap(), "--ocr", "tesseract"]);
+    let again: serde_json::Value = serde_json::from_str(&out).unwrap();
+    assert_eq!(again["reused"], true);
+    assert_eq!(again["artifact"], report["artifact"]);
+    // OCR off: the artifact still exists, and says the text was not read.
+    let (code, out, _) = run(&["capture", "--image", png.to_str().unwrap(), "--store", tmp("capture-off").to_str().unwrap(), "--ocr", "off"]);
+    let off: serde_json::Value = serde_json::from_str(&out).unwrap();
+    assert_eq!(code, 0);
+    assert_eq!(off["textRead"], false);
+    assert!(off["notes"][0].as_str().unwrap().contains("OCR turned off"));
+    for d in [store, dir] {
+        let _ = std::fs::remove_dir_all(d);
+    }
+}

@@ -570,6 +570,17 @@ impl Cx<'_> {
                 )
             })?;
         let o = i.get("options").cloned().unwrap_or(json!({}));
+        let context_bytes = match (str_of(i, "source"), i.get("context")) {
+            (Some("screenshot"), Some(c)) => canon::canonical(c).into_bytes(),
+            (Some("screenshot"), None) => {
+                return Err(err(
+                    "invalid_input",
+                    "a screenshot needs its capture context",
+                    json!([{"pointer": "/context"}]),
+                ))
+            }
+            _ => Vec::new(),
+        };
         let theme = match str_of(&o, "theme") {
             Some("dark") => Theme::Dark,
             _ => Theme::Light,
@@ -617,6 +628,15 @@ impl Cx<'_> {
                 method,
                 declared_name: str_of(i, "name").map(str::to_string),
                 declared_type: str_of(i, "declaredType").map(str::to_string),
+                context: None,
+            }),
+            Some("screenshot") => xeet_capture::image::capture(&xeet_capture::image::Capture {
+                bytes: &bytes,
+                captured_at,
+                method,
+                declared_name: str_of(i, "name").map(str::to_string),
+                declared_type: str_of(i, "declaredType").map(str::to_string),
+                context: Some(&context_bytes),
             }),
             Some("github.pull_request") => github::capture(&github::Capture {
                 bundle_json: &bytes,

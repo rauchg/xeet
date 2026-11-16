@@ -30,6 +30,9 @@ pub struct Entry {
     pub inputs: Vec<String>,
     /// How many elements carry inferred content (readings added by annotate).
     pub inferred: usize,
+    /// Who added readings to it, as `name@version` (from annotate steps), so
+    /// a reading is reused only when the same reader would produce it.
+    pub annotated_by: Vec<String>,
 }
 
 /// `artifact://sha256/<hex>`: the URI form of an artifact id.
@@ -129,6 +132,13 @@ impl Store {
                     .iter()
                     .filter(|e| e.basis == xeet_artifact::Basis::Inferred)
                     .count(),
+                annotated_by: a
+                    .provenance
+                    .transformations
+                    .iter()
+                    .filter(|t| t.step.starts_with("annotate"))
+                    .map(|t| format!("{}@{}", t.tool.name, t.tool.version))
+                    .collect(),
             });
         }
         out

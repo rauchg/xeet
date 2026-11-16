@@ -98,7 +98,7 @@ pub fn to_annotation(
     parent: &str,
     w: u32,
     h: u32,
-    by: &str,
+    by: (&str, &str),
     method: &str,
     at: &str,
 ) -> Result<Value, String> {
@@ -155,7 +155,7 @@ pub fn to_annotation(
     let mut all = vec![root];
     all.extend(elements);
     Ok(
-        json!({"parent": parent, "elements": all, "facts": [], "by": {"name": by, "version": by}, "method": method, "at": at}),
+        json!({"parent": parent, "elements": all, "facts": [], "by": {"name": by.0, "version": by.1}, "method": method, "at": at}),
     )
 }
 
@@ -267,7 +267,7 @@ impl<T: Transport> Provider for ModelReader<T> {
             input["parent"].as_str().unwrap_or("image"),
             w,
             h,
-            &self.model,
+            (&self.manifest.provider.id, &self.manifest.provider.version),
             &method,
             &at,
         ) {
@@ -298,7 +298,7 @@ mod tests {
             "image",
             480,
             356,
-            "m",
+            ("m", "1"),
             "how",
             "2026-11-16T00:00:00Z",
         )

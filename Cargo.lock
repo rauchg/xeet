@@ -1137,6 +1137,7 @@ dependencies = [
  "xeet-core",
  "xeet-engine",
  "xeet-gateway",
+ "xeet-ocr",
  "xeet-resolve",
  "xeet-resolve-net",
  "xeet-text",
@@ -1182,6 +1183,19 @@ dependencies = [
  "xeet-artifact",
  "xeet-capture",
  "xeet-engine",
+]
+
+[[package]]
+name = "xeet-ocr"
+version = "0.1.0"
+dependencies = [
+ "png",
+ "serde",
+ "serde_json",
+ "xeet-artifact",
+ "xeet-capture",
+ "xeet-engine",
+ "xeet-gateway",
 ]
 
 [[package]]
