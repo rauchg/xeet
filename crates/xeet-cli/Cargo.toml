@@ -27,6 +27,7 @@ xeet-resolve-net = { path = "../xeet-resolve-net" }
 # `xeet artifact`: the universal artifact format and its source adapters.
 xeet-artifact = { path = "../xeet-artifact" }
 xeet-capture = { path = "../xeet-capture" }
+xeet-engine = { path = "../xeet-engine" }
 
 # Dedicated render/explain/sheet/serve binary (`xeet-render serve --stdio`
 # speaks the JSON render protocol, while `xeet serve --stdio` serves text

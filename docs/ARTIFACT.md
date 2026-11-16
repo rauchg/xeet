@@ -28,7 +28,8 @@ xeet artifact project pr --consumer vision       # the same, with the image to a
 xeet artifact project pr --focus reviews --max-chars 4000
 xeet artifact invoke post retheme --input '{"theme":"dark"}' -o post-dark
 xeet artifact annotate post reading.json -o post-read   # model-read content, as inference
-xeet artifact mcp                # the read-only operations as an MCP server (stdio)
+xeet engine discover --outcome "understand a screenshot without vision" --accepts text/plain
+xeet engine mcp --grant store:read,store:write   # the provider over MCP (stdio)
 ```
 
 Two committed examples, verifiable offline: [`artifacts/x-post`](artifacts/x-post),
@@ -258,7 +259,85 @@ vision model on the PNG). That is the experiment that would quantify the
 "capability equalizer" claim; the deterministic coverage report is the
 precondition for running it fairly.
 
-## 4. Architecture
+## 4. The engine as a provider: discovery and agent interoperability
+
+`crates/xeet-engine` exposes the representation engine as a provider whose
+capabilities are **contracts, not tools**. A contract is data
+([`contract.rs`](../crates/xeet-engine/src/contract.rs)): id and version,
+summary, the outcomes it serves (in an agent's words), input modalities,
+output **modes** (which modalities come back, and which input fields select
+them), input and output JSON Schemas, effects, required authority,
+preconditions, guarantees, limitations, constraints and error codes. The
+manifest ([`engine.manifest.json`](engine.manifest.json), checked against the
+build by a test) adds provider identity, interfaces, compatibility, the
+authority model, supported sources with their adapters, coverage and
+fidelity, and **non-capabilities**: outcomes the provider is asked for but
+does not provide, with why and the honest alternative.
+
+Capabilities: `representation.capture`, `ingest`, `inspect`, `understand`,
+`render`, `derive`, `verify`, `compare`, `retrieve`, `annotate`.
+
+**One execution path.** `Engine::invoke(capability, input, session)` checks,
+in order: input size, input schema (errors carry JSON pointers), the
+session's authority, then runs the capability, then validates its own result
+against the declared output schema. It returns an `Outcome` with
+`inputDigest`, `resultDigest`, the artifacts read or created, and the scopes
+checked. Anything that creates an artifact verifies it (with byte-for-byte
+reproduction) before storing it in a content-addressed store
+(`<store>/<hex>/`, URIs `artifact://sha256/<hex>`).
+
+**Three separations, enforced in code:**
+
+- *Discovery is not invocation.* `discover`/`describe` are pure functions of
+  manifests; they cannot call anything and take no session.
+- *Invocation is not authorization.* Scopes (`store:read`, `store:write`,
+  `fs:read` limited to host-given read roots) come only from the host's
+  `Session` (`--grant`, `--allow-read`); the default is `store:read`. Every
+  call checks its own scopes and names the missing ones. Discovering a
+  capability, or a provider being available, grants nothing.
+- *No capability acts at a source.* Nothing modifies or deletes; the only
+  effect is adding a verified artifact. Source actions (merge, reply, like)
+  are described inside artifacts with their authority, and `derive` refuses
+  them.
+
+**Discovery and negotiation.** An agent asks by outcome and by the modalities
+it can consume: `--outcome "understand a screenshot without vision" --accepts
+text/plain` returns `representation.understand` with mode
+`{consumer: text, format: text}`, and reports `representation.render` as
+excluded by modality (it only yields `image/png`). Matching is deterministic
+keyword overlap with declared outcomes — not semantic search, and the
+manifest says so. When a query hits a declared non-capability ("OCR text from
+a photo", "merge a pull request"), discovery returns an explicit
+`notProvided` with the alternative, and its note warns that remaining matches
+only share words. Several manifests can be searched together (`--peer`); the
+same contract id from two providers is listed per provider (tested with a
+hypothetical peer fixture, `tests/fixtures/engine/peer-vision.manifest.json`).
+
+**Progressive disclosure.** The MCP server lists three tools by default —
+`engine_discover`, `engine_describe`, `engine_invoke` — or every capability as
+its own tool with `--tools all`. Measured: initial `tools/list` 1.8 KB
+(progressive) vs 8.4 KB (all); a top-3 discovery 1.8 KB; one full contract
+5.5 KB; the full manifest 39 KB.
+
+**MCP specifics.** Artifacts are resources (`resources/list`; templates for
+the document, `…/projection/{text|vision}` and `…/view/{id}`). Results carry
+`structuredContent` (the outcome) and text content; image blocks appear only
+when the caller asked for pixels (`render`, or `understand` with
+`consumer: vision`). A text-only client never receives an image. Errors come
+back as `isError` with the outcome's error code, message and details.
+
+**Transport independence.** MCP and the CLI (`xeet engine call ID --input
+JSON`) are layers over `Engine::invoke`; a test shows the CLI and MCP return
+the same `resultDigest` for the same input. HTTP, AppPort or another agent
+protocol would be another layer; none is implemented yet.
+
+What is not done: no HTTP transport; discovery of the provider itself relies
+on the host configuring the MCP server or reading the manifest (no registry
+or network announcement); grants are coarse scopes per session, not
+per-artifact or per-user; there is no rate limiting beyond the input-size
+limit and the renderer's own budgets.
+
+## 5. Architecture
 
 ```
           source bytes + capture time (caller-supplied; adapters never fetch)
@@ -274,7 +353,12 @@ precondition for running it fairly.
    │       sha2                 │
    └─────────────┬──────────────┘
                  │
-   CLI `xeet artifact …` · MCP `xeet artifact mcp` · Rust library
+   ┌─────────────┴──────────────┐
+   │ xeet-engine (provider)     │   contracts · manifest · discover · invoke
+   │                            │   authority per session · content-addressed store
+   └─────────────┬──────────────┘
+                 │
+   CLI `xeet engine …` / `xeet artifact …` · MCP `xeet engine mcp` · Rust library
 ```
 
 | layer | lines | source-specific? |
@@ -284,7 +368,8 @@ precondition for running it fairly.
 | `xeet-capture/lib.rs` (shared helpers, reproducer dispatch) | 109 | no |
 | `xeet-capture/x.rs` | 627 | X |
 | `xeet-capture/github.rs` | 663 | GitHub |
-| CLI + MCP (`commands/artifact.rs`) | 403 | no |
+| `xeet-engine` (contracts, manifest, discovery, schema validation, store, invoke) | 1381 | no |
+| CLI + MCP transports (`commands/artifact.rs`, `commands/engine.rs`) | 749 | no |
 | `xeet-core` change | 14 | — |
 
 **Adding a source** = one adapter module that maps source bytes to elements,
@@ -295,7 +380,7 @@ change to `xeet-artifact`; the core's checks apply to it unchanged
 
 ---
 
-## 5. Evidence
+## 6. Evidence
 
 Tests (`crates/xeet-capture/tests/artifacts.rs`, `crates/xeet-cli/tests/artifact_cli.rs`,
 `crates/xeet-artifact/src/canon.rs`):
@@ -338,7 +423,7 @@ authority).
 
 ---
 
-## 6. What is not done, and known limits
+## 7. What is not done, and known limits
 
 - **The GitHub fixture is constructed**, in REST API shape; it is not a recorded
   response (it says so in `_fixture`). This session had no API access to a
@@ -359,7 +444,7 @@ authority).
 - Reproduction depends on the renderer version: an artifact made by an older
   ruleset reproduces only with that ruleset. Integrity checks do not.
 
-## 7. One decision worth recording
+## 8. One decision worth recording
 
 Identity first failed a disk round trip: `serde_json`'s default float parser is
 one ulp off on some 17-digit values. Turning on `serde_json/float_roundtrip`
@@ -369,12 +454,12 @@ threat to xeet's native/WASM byte identity. Instead, identity is computed from
 number tokens as written, and geometry is quantized to 1/64 px (Blink's
 LayoutUnit, and the parity gate's tolerance).
 
-## 8. Integration boundaries (no dependencies in the core)
+## 9. Integration boundaries (no dependencies in the core)
 
-- **Capability host (AppPort-style):** the CLI subcommands and MCP tools are
-  the operations — capture, verify, compare, inspect, capabilities, project —
-  with JSON in and out and explicit authority fields. A host exposes them; it
-  does not need to link this code.
+- **Capability host (AppPort-style):** the manifest and contracts are the
+  integration surface — versioned, transport-free, with schemas, modalities,
+  authority and non-capabilities. A host maps its own grants onto the
+  session scopes and calls `Engine::invoke` (or the CLI); nothing is redefined.
 - **Durable store (FeltDB-style):** the package is already content-addressed
   (`id`, asset hashes), versioned (`formatVersion`), linked (`derivedFrom`),
   and temporal (`capturedAt`, `state.asOf`). A store keys artifacts by `id`,
@@ -386,7 +471,7 @@ LayoutUnit, and the parity gate's tolerance).
   `compare` give an agent structure to search and reason over; the views give
   people the evidence. Neither needs a model to be read or checked.
 
-## 9. Next highest-value step
+## 10. Next highest-value step
 
 Capture **real** observations over time: a small fetcher (outside the core,
 like `xeet-resolve-net`) that turns a PR URL into a REST bundle with the

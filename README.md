@@ -77,7 +77,10 @@ content-addressed and verifiable offline (including byte-for-byte
 reproduction of the view). The image is one projection of the artifact, not
 the artifact: `xeet artifact project` gives a text-only model the same
 information — elements, positions, layout rows, state, capabilities — with
-anything that exists only as pixels named, never guessed. See [`docs/ARTIFACT.md`](docs/ARTIFACT.md).
+anything that exists only as pixels named, never guessed.
+`xeet engine mcp` serves it to agents: discovery by outcome and modality,
+versioned capability contracts ([`docs/engine.manifest.json`](docs/engine.manifest.json)),
+and per-session authority that discovery never grants. See [`docs/ARTIFACT.md`](docs/ARTIFACT.md).
 
 ## Running it
 

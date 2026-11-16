@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/xeet-core", "crates/xeet-text", "crates/xeet-resolve", "crates/xeet-resolve-net", "crates/xeet-cli", "crates/xeet-wasm", "crates/xeet-artifact", "crates/xeet-capture"]
+members = ["crates/xeet-core", "crates/xeet-text", "crates/xeet-resolve", "crates/xeet-resolve-net", "crates/xeet-cli", "crates/xeet-wasm", "crates/xeet-artifact", "crates/xeet-capture", "crates/xeet-engine"]
 
 [workspace.package]
 version = "0.1.0"

@@ -8,7 +8,6 @@
 use super::*;
 
 use serde_json::Value;
-use std::io::BufRead;
 use std::path::Path;
 use xeet_artifact::{annotate, compare, inspect, project, verify, Artifact, Package};
 use xeet_capture::{github, x, Reproducers};
@@ -35,8 +34,7 @@ artifact invoke DIR CAPABILITY [--input JSON] -o OUT
 artifact annotate DIR ANNOTATION.json -o OUT
                                         add model-read content as declared inference,
                                         in a new artifact derived from DIR
-artifact mcp                            MCP server on stdio (JSON-RPC, one message
-                                        per line): read-only artifact tools";
+artifact mcp                            moved to `xeet engine mcp`";
 
 const KNOWN: &[&str] = &[
     "o",
@@ -123,7 +121,7 @@ pub fn run(argv: &[String]) -> u8 {
         ["invoke", dir, cap] => invoke(&args, dir, cap),
         ["project", dir] => project_cmd(&args, dir),
         ["annotate", dir, file] => annotate_cmd(&args, dir, file),
-        ["mcp"] => mcp(),
+        ["mcp"] => Err("moved: the MCP server is `xeet engine mcp` (see `xeet engine --help`)".to_string()),
         _ => return usage_error("unknown artifact subcommand"),
     };
     match result {
@@ -420,190 +418,4 @@ fn print_comparison(c: &compare::Comparison) {
     for id in &c.capabilities_removed {
         println!("- capability {id}");
     }
-}
-
-// ---------------------------------------------------------------------------
-// MCP: the same read-only operations, discoverable by agents.
-// ---------------------------------------------------------------------------
-
-fn mcp_tools() -> Value {
-    let path = serde_json::json!({"type": "string", "description": "Path to an artifact directory (holds artifact.json)"});
-    serde_json::json!([
-        {"name": "artifact_inspect", "title": "Inspect an artifact",
-         "description": "Returns the artifact document: subject, provenance, views, semantic elements with bounds, state as of capture, capabilities, limitations and coverage. Read-only, offline.",
-         "inputSchema": {"type": "object", "required": ["path"], "additionalProperties": false, "properties": {"path": path}},
-         "annotations": {"readOnlyHint": true, "openWorldHint": false}},
-        {"name": "artifact_verify", "title": "Verify an artifact",
-         "description": "Deterministic checks: identity hash, asset hashes, view dimensions, semantic graph references, basis honesty, temporal grounding, capability authority rules, and (by default) byte-for-byte reproduction of views from the preserved inputs. Also lists what verification cannot establish.",
-         "inputSchema": {"type": "object", "required": ["path"], "additionalProperties": false, "properties": {"path": path, "reproduce": {"type": "boolean", "default": true}}},
-         "annotations": {"readOnlyHint": true, "openWorldHint": false}},
-        {"name": "artifact_compare", "title": "Compare two artifacts",
-         "description": "What differs between two observations: views (by hash), elements, state facts, capabilities. Identical pixels do not imply identical meaning; both are reported.",
-         "inputSchema": {"type": "object", "required": ["a", "b"], "additionalProperties": false, "properties": {"a": path, "b": path}},
-         "annotations": {"readOnlyHint": true, "openWorldHint": false}},
-        {"name": "artifact_capabilities", "title": "List capabilities",
-         "description": "What could be done with the observed object, with input schemas, executors, required authority and verification methods. Descriptions only: this server executes none of them.",
-         "inputSchema": {"type": "object", "required": ["path"], "additionalProperties": false, "properties": {"path": path}},
-         "annotations": {"readOnlyHint": true, "openWorldHint": false}},
-        {"name": "artifact_project", "title": "Project an artifact for a consumer",
-         "description": "A deterministic projection of the artifact for a text-only or vision-capable consumer: every element's meaning as text with hierarchy, bounds and layout rows, plus state, provenance, capabilities, limitations, and what exists only as pixels. With consumer=vision the view image is attached; anything read from it is inference. Supports a focus element, depth, per-string and total character budgets; omissions are listed.",
-         "inputSchema": {"type": "object", "required": ["path"], "additionalProperties": false, "properties": {
-            "path": path,
-            "consumer": {"enum": ["text", "vision"], "default": "text"},
-            "format": {"enum": ["text", "json"], "default": "text"},
-            "focus": {"type": "string", "description": "element id; its ancestors are kept as context"},
-            "depth": {"type": "integer", "minimum": 0},
-            "sections": {"type": "array", "items": {"enum": ["elements", "layout", "relations", "state", "capabilities", "limitations", "consumers"]}},
-            "maxText": {"type": "integer", "minimum": 1},
-            "maxChars": {"type": "integer", "minimum": 1},
-            "compactCapabilities": {"type": "boolean", "default": false}}},
-         "annotations": {"readOnlyHint": true, "openWorldHint": false}},
-        {"name": "artifact_view", "title": "Show a view",
-         "description": "Returns one visual projection (PNG) of the artifact as an image, with its view metadata.",
-         "inputSchema": {"type": "object", "required": ["path"], "additionalProperties": false, "properties": {"path": path, "view": {"type": "string", "default": "v0"}}},
-         "annotations": {"readOnlyHint": true, "openWorldHint": false}}
-    ])
-}
-
-fn mcp_call(name: &str, a: &Value) -> Result<Value, String> {
-    let arg = |k: &str| {
-        a.get(k)
-            .and_then(Value::as_str)
-            .ok_or_else(|| format!("missing `{k}`"))
-    };
-    let text = |v: &Value| serde_json::json!({"content": [{"type": "text", "text": serde_json::to_string_pretty(v).unwrap()}], "structuredContent": v});
-    match name {
-        "artifact_inspect" => {
-            let (p, _) = read(arg("path")?)?;
-            Ok(text(&p.document))
-        }
-        "artifact_verify" => {
-            let p = Package::read_dir(Path::new(arg("path")?))?;
-            let reproduce = a.get("reproduce").and_then(Value::as_bool).unwrap_or(true);
-            let r = Reproducers;
-            let v = verify::verify(&p, if reproduce { Some(&r) } else { None });
-            Ok(text(&serde_json::to_value(v).unwrap()))
-        }
-        "artifact_compare" => {
-            let (_, x) = read(arg("a")?)?;
-            let (_, y) = read(arg("b")?)?;
-            Ok(text(
-                &serde_json::to_value(compare::compare(&x, &y)).unwrap(),
-            ))
-        }
-        "artifact_capabilities" => {
-            let (_, x) = read(arg("path")?)?;
-            Ok(text(
-                &serde_json::json!({"capabilityPolicy": x.capability_policy, "capabilities": x.capabilities}),
-            ))
-        }
-        "artifact_project" => {
-            let (_, x) = read(arg("path")?)?;
-            let get = |k: &str| -> Option<String> {
-                let key = match k {
-                    "max-text" => "maxText",
-                    "max-chars" => "maxChars",
-                    "compact-capabilities" => "compactCapabilities",
-                    other => other,
-                };
-                match a.get(key)? {
-                    Value::String(s) => Some(s.clone()),
-                    Value::Number(n) => Some(n.to_string()),
-                    Value::Bool(b) => Some(b.to_string()),
-                    Value::Array(items) => Some(
-                        items
-                            .iter()
-                            .filter_map(Value::as_str)
-                            .collect::<Vec<_>>()
-                            .join(","),
-                    ),
-                    _ => None,
-                }
-            };
-            let (req, form) = projection_request(get)?;
-            let body = project::render(&x, &req, form)?;
-            let mut content = Vec::new();
-            if req.consumer == project::Consumer::Vision {
-                for v in &x.views {
-                    let bytes = p_bytes(&x, arg("path")?, &v.asset)?;
-                    content.push(serde_json::json!({"type": "image", "mimeType": v.media_type, "data": xeet_resolve::b64(&bytes)}));
-                }
-            }
-            content.push(serde_json::json!({"type": "text", "text": body}));
-            Ok(serde_json::json!({"content": content}))
-        }
-        "artifact_view" => {
-            let (p, x) = read(arg("path")?)?;
-            let id = a.get("view").and_then(Value::as_str).unwrap_or("v0");
-            let view = x
-                .views
-                .iter()
-                .find(|v| v.id == id)
-                .ok_or_else(|| format!("no view {id}"))?;
-            let bytes = p.asset_bytes(&view.asset).ok_or("view asset missing")?;
-            let meta = serde_json::to_value(view).unwrap();
-            Ok(serde_json::json!({"content": [
-                {"type": "image", "mimeType": view.media_type, "data": xeet_resolve::b64(bytes)},
-                {"type": "text", "text": serde_json::to_string(&meta).unwrap()}
-            ], "structuredContent": meta}))
-        }
-        other => Err(format!("unknown tool {other}")),
-    }
-}
-
-fn p_bytes(_a: &Artifact, dir: &str, sha: &str) -> Result<Vec<u8>, String> {
-    let p = Package::read_dir(Path::new(dir))?;
-    p.asset_bytes(sha)
-        .map(<[u8]>::to_vec)
-        .ok_or_else(|| format!("asset {sha} missing"))
-}
-
-fn mcp() -> Result<u8, String> {
-    let stdin = std::io::stdin();
-    let mut stdout = std::io::stdout();
-    for line in stdin.lock().lines() {
-        let line = line.map_err(|e| e.to_string())?;
-        if line.trim().is_empty() {
-            continue;
-        }
-        let msg: Value = match serde_json::from_str(&line) {
-            Ok(v) => v,
-            Err(e) => {
-                let err = serde_json::json!({"jsonrpc": "2.0", "id": null, "error": {"code": -32700, "message": e.to_string()}});
-                writeln!(stdout, "{err}").map_err(|e| e.to_string())?;
-                continue;
-            }
-        };
-        let Some(id) = msg.get("id").cloned() else {
-            continue;
-        }; // notification
-        let params = msg.get("params").cloned().unwrap_or(Value::Null);
-        let result = match msg.get("method").and_then(Value::as_str).unwrap_or("") {
-            "initialize" => Ok(serde_json::json!({
-                "protocolVersion": params.get("protocolVersion").cloned().unwrap_or(serde_json::json!("2025-06-18")),
-                "capabilities": {"tools": {}},
-                "serverInfo": {"name": "xeet-artifact", "version": env!("CARGO_PKG_VERSION")},
-                "instructions": "Artifacts are historical observations. Capabilities are descriptions, never grants; this server executes none of them."
-            })),
-            "ping" => Ok(serde_json::json!({})),
-            "tools/list" => Ok(serde_json::json!({"tools": mcp_tools()})),
-            "tools/call" => {
-                let name = params.get("name").and_then(Value::as_str).unwrap_or("");
-                let args = params.get("arguments").cloned().unwrap_or(Value::Null);
-                Ok(mcp_call(name, &args).unwrap_or_else(|e| {
-                    serde_json::json!({"content": [{"type": "text", "text": e}], "isError": true})
-                }))
-            }
-            m => Err(
-                serde_json::json!({"code": -32601, "message": format!("method not found: {m}")}),
-            ),
-        };
-        let reply = match result {
-            Ok(r) => serde_json::json!({"jsonrpc": "2.0", "id": id, "result": r}),
-            Err(e) => serde_json::json!({"jsonrpc": "2.0", "id": id, "error": e}),
-        };
-        writeln!(stdout, "{reply}").map_err(|e| e.to_string())?;
-        stdout.flush().map_err(|e| e.to_string())?;
-    }
-    Ok(EXIT_OK)
 }

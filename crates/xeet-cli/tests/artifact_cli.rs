@@ -130,54 +130,6 @@ fn capture_verify_inspect_compare_project() {
 }
 
 #[test]
-fn mcp_server_lists_and_calls_tools() {
-    let pr = root().join("tests/fixtures/github/pr-open-reviewed.json");
-    let dir = tmp("mcp");
-    let (code, _, err) = run(&[
-        "artifact",
-        "capture",
-        "github",
-        pr.to_str().unwrap(),
-        "-o",
-        dir.to_str().unwrap(),
-        "--captured-at=2026-11-16T12:00:00Z",
-    ]);
-    assert_eq!(code, 0, "{err}");
-    let mut child = Command::new(BIN)
-        .args(["artifact", "mcp"])
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .spawn()
-        .unwrap();
-    let p = dir.to_str().unwrap();
-    let msgs = [
-        r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18"}}"#.to_string(),
-        r#"{"jsonrpc":"2.0","method":"notifications/initialized"}"#.to_string(),
-        r#"{"jsonrpc":"2.0","id":2,"method":"tools/list"}"#.to_string(),
-        format!(r#"{{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{{"name":"artifact_capabilities","arguments":{{"path":{p:?}}}}}}}"#),
-        r#"{"jsonrpc":"2.0","id":4,"method":"nope"}"#.to_string(),
-    ];
-    {
-        let stdin = child.stdin.as_mut().unwrap();
-        for m in &msgs {
-            writeln!(stdin, "{m}").unwrap();
-        }
-    }
-    let out = child.wait_with_output().unwrap();
-    let replies: Vec<serde_json::Value> = String::from_utf8(out.stdout)
-        .unwrap()
-        .lines()
-        .map(|l| serde_json::from_str(l).unwrap())
-        .collect();
-    assert_eq!(replies.len(), 4, "the notification gets no reply");
-    assert_eq!(replies[1]["result"]["tools"].as_array().unwrap().len(), 6);
-    let caps = &replies[2]["result"]["structuredContent"];
-    assert_eq!(caps["capabilityPolicy"], "descriptive-only");
-    assert_eq!(replies[3]["error"]["code"], -32601);
-    let _ = std::fs::remove_dir_all(dir);
-}
-
-#[test]
 fn text_only_and_vision_consumers_and_annotation() {
     let x_post = root().join("docs/artifacts/x-post");
     let x_post = x_post.to_str().unwrap();
@@ -259,42 +211,191 @@ fn text_only_and_vision_consumers_and_annotation() {
     assert!(err.contains("only add inferred"), "{err}");
     let _ = std::fs::remove_dir_all(dir);
     let _ = std::fs::remove_file(ann);
+}
 
-    // Over MCP, a vision consumer gets the image and the same text.
+/// One MCP session: send messages, return one reply per request.
+fn mcp(extra: &[&str], msgs: &[String]) -> Vec<serde_json::Value> {
+    let mut args = vec!["engine", "mcp"];
+    args.extend_from_slice(extra);
     let mut child = Command::new(BIN)
-        .args(["artifact", "mcp"])
+        .args(&args)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
         .unwrap();
     {
         let stdin = child.stdin.as_mut().unwrap();
-        for consumer in ["text", "vision"] {
-            writeln!(stdin, r#"{{"jsonrpc":"2.0","id":"{consumer}","method":"tools/call","params":{{"name":"artifact_project","arguments":{{"path":{x_post:?},"consumer":"{consumer}","maxChars":4000}}}}}}"#).unwrap();
+        for m in msgs {
+            writeln!(stdin, "{m}").unwrap();
         }
     }
     let out = child.wait_with_output().unwrap();
-    let replies: Vec<serde_json::Value> = String::from_utf8(out.stdout)
+    String::from_utf8(out.stdout)
         .unwrap()
         .lines()
         .map(|l| serde_json::from_str(l).unwrap())
+        .collect()
+}
+
+fn call(id: u32, tool: &str, args: serde_json::Value) -> String {
+    serde_json::json!({"jsonrpc": "2.0", "id": id, "method": "tools/call", "params": {"name": tool, "arguments": args}}).to_string()
+}
+
+#[test]
+fn a_text_only_agent_discovers_and_uses_the_engine_over_mcp() {
+    let store = tmp("mcp-store");
+    let store_s = store.to_str().unwrap().to_string();
+    let post: serde_json::Value = serde_json::from_slice(
+        &std::fs::read(root().join("tests/fixtures/posts/media-four.json")).unwrap(),
+    )
+    .unwrap();
+    let capture_input =
+        serde_json::json!({"source": "x.post", "data": post, "capturedAt": "2026-11-16T12:00:00Z"});
+    let init = r#"{"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":"2025-06-18"}}"#.to_string();
+    let msgs = vec![
+        init.clone(),
+        r#"{"jsonrpc":"2.0","method":"notifications/initialized"}"#.to_string(),
+        r#"{"jsonrpc":"2.0","id":1,"method":"tools/list"}"#.to_string(),
+        call(
+            2,
+            "engine_discover",
+            serde_json::json!({"outcome": "understand a screenshot without vision", "accepts": ["text/plain"]}),
+        ),
+        call(
+            3,
+            "engine_describe",
+            serde_json::json!({"capabilities": ["representation.capture"]}),
+        ),
+        call(
+            4,
+            "engine_invoke",
+            serde_json::json!({"capability": "representation.capture", "input": capture_input}),
+        ),
+    ];
+    // Read-only session (the default): capture is refused, with the missing scope named.
+    let r = mcp(&["--store", &store_s], &msgs);
+    assert_eq!(r.len(), 5, "the notification gets no reply");
+    assert!(r[0]["result"]["instructions"]
+        .as_str()
+        .unwrap()
+        .contains("engine_discover"));
+    let tools: Vec<&str> = r[1]["result"]["tools"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|t| t["name"].as_str().unwrap())
         .collect();
-    let kinds = |r: &serde_json::Value| {
-        r["result"]["content"]
+    assert_eq!(
+        tools,
+        ["engine_discover", "engine_describe", "engine_invoke"],
+        "progressive by default"
+    );
+    assert!(
+        r[1].to_string().len() < 4000,
+        "the initial tool list stays small: {}",
+        r[1].to_string().len()
+    );
+    let top = &r[2]["result"]["structuredContent"]["matches"][0];
+    assert_eq!(top["capability"], "representation.understand");
+    assert_eq!(top["mode"]["select"]["consumer"], "text");
+    assert!(r[3]["result"]["structuredContent"]["contracts"][0]["inputSchema"].is_object());
+    assert_eq!(r[4]["result"]["isError"], true);
+    assert_eq!(
+        r[4]["result"]["structuredContent"]["error"]["details"]["missing"],
+        serde_json::json!(["store:write"])
+    );
+
+    // With the host's grant: capture, then read it as text, as resources, and as an image only on request.
+    let r = mcp(
+        &["--store", &store_s, "--grant", "store:read,store:write"],
+        &msgs[..],
+    );
+    let created = &r[4]["result"]["structuredContent"];
+    assert_eq!(created["ok"], true, "{created}");
+    let id = created["result"]["id"].as_str().unwrap().to_string();
+    let uri = created["result"]["artifact"].as_str().unwrap().to_string();
+    let digest = created["resultDigest"].clone();
+    let msgs = vec![
+        init,
+        call(1, "engine_invoke", serde_json::json!({"capability": "representation.understand", "input": {"artifact": id, "maxChars": 3000}})),
+        r#"{"jsonrpc":"2.0","id":2,"method":"resources/list"}"#.to_string(),
+        serde_json::json!({"jsonrpc": "2.0", "id": 3, "method": "resources/read", "params": {"uri": format!("{uri}/projection/text")}}).to_string(),
+        serde_json::json!({"jsonrpc": "2.0", "id": 4, "method": "resources/read", "params": {"uri": format!("{uri}/view/v0")}}).to_string(),
+        call(5, "engine_invoke", serde_json::json!({"capability": "representation.understand", "input": {"artifact": id, "consumer": "vision", "maxChars": 3000}})),
+        call(6, "engine_invoke", serde_json::json!({"capability": "representation.verify", "input": {"artifact": id}})),
+    ];
+    let r = mcp(&["--store", &store_s], &msgs);
+    let kinds = |v: &serde_json::Value| {
+        v["result"]["content"]
             .as_array()
             .unwrap()
             .iter()
             .map(|c| c["type"].as_str().unwrap().to_string())
             .collect::<Vec<_>>()
     };
-    assert_eq!(kinds(&replies[0]), ["text"]);
-    assert_eq!(kinds(&replies[1]), ["image", "text"]);
-    assert!(
-        replies[0]["result"]["content"][0]["text"]
-            .as_str()
-            .unwrap()
-            .chars()
-            .count()
-            <= 4000
+    assert_eq!(
+        kinds(&r[1]),
+        ["text", "text"],
+        "a text-only consumer receives no image"
     );
+    let projection = r[1]["result"]["content"][0]["text"].as_str().unwrap();
+    assert!(
+        projection.contains("[visual-only]") && projection.chars().count() <= 3000,
+        "{projection}"
+    );
+    assert!(r[2]["result"]["resources"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|x| x["uri"] == uri.as_str()));
+    assert!(r[3]["result"]["contents"][0]["text"]
+        .as_str()
+        .unwrap()
+        .starts_with("ARTIFACT "));
+    assert!(r[4]["result"]["contents"][0]["blob"]
+        .as_str()
+        .unwrap()
+        .starts_with("iVBOR"));
+    assert_eq!(
+        kinds(&r[5]),
+        ["image", "text", "text"],
+        "a vision consumer asked for pixels"
+    );
+    assert_eq!(r[6]["result"]["structuredContent"]["result"]["ok"], true);
+
+    // Transport independence: the CLI transport returns the same outcome digest.
+    let input = tmp("capture-input.json");
+    std::fs::write(&input, capture_input.to_string()).unwrap();
+    let (code, out, err) = run(&[
+        "engine",
+        "call",
+        "representation.capture",
+        "--input",
+        &format!("@{}", input.display()),
+        "--store",
+        &store_s,
+        "--grant",
+        "store:write",
+    ]);
+    assert_eq!(code, 0, "{err}");
+    let cli: serde_json::Value = serde_json::from_str(&out).unwrap();
+    assert_eq!(cli["resultDigest"], digest);
+
+    // Every capability as its own tool, for clients that prefer that.
+    let r = mcp(
+        &["--store", &store_s, "--tools", "all"],
+        &[
+            r#"{"jsonrpc":"2.0","id":1,"method":"tools/list"}"#.to_string(),
+            call(
+                2,
+                "representation_verify",
+                serde_json::json!({"artifact": id}),
+            ),
+        ],
+    );
+    assert_eq!(r[0]["result"]["tools"].as_array().unwrap().len(), 10);
+    assert_eq!(r[1]["result"]["structuredContent"]["ok"], true);
+
+    let _ = std::fs::remove_dir_all(store);
+    let _ = std::fs::remove_file(input);
 }

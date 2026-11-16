@@ -1135,6 +1135,7 @@ dependencies = [
  "xeet-artifact",
  "xeet-capture",
  "xeet-core",
+ "xeet-engine",
  "xeet-resolve",
  "xeet-resolve-net",
  "xeet-text",
@@ -1157,6 +1158,17 @@ dependencies = [
  "unicode-bidi",
  "xeet-text",
  "zune-jpeg",
+]
+
+[[package]]
+name = "xeet-engine"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "xeet-artifact",
+ "xeet-capture",
+ "xeet-core",
 ]
 
 [[package]]
