@@ -120,6 +120,9 @@ pub struct Classification {
     pub rule: Option<usize>,
     /// For modality errors: the family the body names (`image`, `audio`, …).
     pub modality_family: Option<String>,
+    /// The phrase that matched, so a reviewer can see the evidence.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub matched: Option<String>,
 }
 
 /// Ordered rules; the first match wins. A host can append or replace rules
@@ -151,6 +154,13 @@ impl Default for Classifier {
                 rule(RateLimit, &[429], &[], "HTTP semantics"),
                 // Context overflow is checked before modality: both are 400s.
                 rule(ContextOverflow, &[], &["context_length_exceeded", "maximum context length", "context window", "prompt is too long", "too many tokens"], "common provider error text"),
+                // Observed live through Vercel AI Gateway (fixtures named below).
+                rule(
+                    UnsupportedModality,
+                    &[400],
+                    &["does not accept image input", "does not accept audio input", "does not accept video input", "doesn't support the image content block", "doesn't support the audio content block", "doesn't support the video content block", "doesn't support the document content block"],
+                    "tests/fixtures/gateway/ai-gateway-400-deepseek-v3.1-image.json, ai-gateway-400-nova-micro-image.json",
+                ),
                 rule(
                     UnsupportedModality,
                     &[400, 415, 422],
@@ -177,41 +187,49 @@ impl Default for Classifier {
 
 impl Classifier {
     pub fn classify(&self, e: &ProviderError) -> Classification {
+        let none = |kind| Classification {
+            kind,
+            rule: None,
+            modality_family: None,
+            matched: None,
+        };
         if e.transport {
-            return Classification {
-                kind: ErrorKind::Transport,
-                rule: None,
-                modality_family: None,
-            };
+            return none(ErrorKind::Transport);
         }
         let body = e.body.to_lowercase();
         for (i, r) in self.rules.iter().enumerate() {
             let status_ok =
                 r.statuses.is_empty() || e.status.is_some_and(|s| r.statuses.contains(&s));
-            let phrase_ok =
-                r.phrases.is_empty() || r.phrases.iter().any(|p| body.contains(p.as_str()));
+            let hit = r
+                .phrases
+                .iter()
+                .find(|p| body.contains(p.as_str()))
+                .cloned();
+            let phrase_ok = r.phrases.is_empty() || hit.is_some();
             if status_ok && phrase_ok && !(r.statuses.is_empty() && r.phrases.is_empty()) {
-                let family = (r.kind == ErrorKind::UnsupportedModality).then(|| {
-                    ["image", "audio", "video", "pdf", "document"]
-                        .iter()
-                        .find(|f| body.contains(*f))
-                        .map(|f| match *f {
-                            "pdf" | "document" => "application".to_string(),
-                            other => other.to_string(),
-                        })
-                });
+                // The family the matched phrase names; else the first the body names.
+                let families = ["image", "audio", "video", "pdf", "document"];
+                let family = (r.kind == ErrorKind::UnsupportedModality)
+                    .then(|| {
+                        let from = |t: &str| families.iter().find(|f| t.contains(*f)).copied();
+                        hit.as_deref()
+                            .and_then(from)
+                            .or_else(|| from(&body))
+                            .map(|f| match f {
+                                "pdf" | "document" => "application".to_string(),
+                                other => other.to_string(),
+                            })
+                    })
+                    .flatten();
                 return Classification {
                     kind: r.kind,
                     rule: Some(i),
-                    modality_family: family.flatten(),
+                    modality_family: family,
+                    matched: hit,
                 };
             }
         }
-        Classification {
-            kind: ErrorKind::Unknown,
-            rule: None,
-            modality_family: None,
-        }
+        none(ErrorKind::Unknown)
     }
 }
 
@@ -224,6 +242,74 @@ mod tests {
             status: Some(status),
             body: body.into(),
             transport: false,
+        }
+    }
+
+    /// A recorded body, without the `_recorded` note added for humans: only
+    /// what the provider sent is evidence.
+    fn fixture(name: &str) -> String {
+        let text = std::fs::read_to_string(format!(
+            "{}/../../tests/fixtures/gateway/{name}",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .unwrap();
+        let mut v: serde_json::Value = serde_json::from_str(&text).unwrap();
+        if let Some(m) = v.as_object_mut() {
+            m.remove("_recorded");
+        }
+        v.to_string()
+    }
+
+    #[test]
+    fn real_rejections_recorded_live_are_classified_correctly() {
+        let c = Classifier::default();
+        for (name, status, kind, family) in [
+            (
+                "ai-gateway-400-deepseek-v3.1-image.json",
+                400,
+                ErrorKind::UnsupportedModality,
+                Some("image"),
+            ),
+            (
+                "ai-gateway-400-nova-micro-image.json",
+                400,
+                ErrorKind::UnsupportedModality,
+                Some("image"),
+            ),
+            // The top-level message alone ("Bad Request") names no modality: no fallback.
+            (
+                "ai-gateway-400-llama-3.1-8b-image.json",
+                400,
+                ErrorKind::InvalidRequest,
+                None,
+            ),
+            // The full body carries the gateway's routed provider attempts; one says
+            // images are unsupported. That is real evidence, and it is what the run saw.
+            (
+                "ai-gateway-400-llama-3.1-8b-image-full.json",
+                400,
+                ErrorKind::UnsupportedModality,
+                Some("image"),
+            ),
+            (
+                "ai-gateway-403-free-tier.json",
+                403,
+                ErrorKind::Authentication,
+                None,
+            ),
+            (
+                "openai-429-insufficient-quota.json",
+                429,
+                ErrorKind::Quota,
+                None,
+            ),
+        ] {
+            let got = c.classify(&e(status, &fixture(name)));
+            assert_eq!(
+                (got.kind, got.modality_family.as_deref()),
+                (kind, family),
+                "{name}"
+            );
         }
     }
 

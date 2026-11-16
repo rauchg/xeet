@@ -1,0 +1,361 @@
+{
+  "at": "2026-11-16T16:09:19Z",
+  "attempts": [
+    {
+      "n": 0,
+      "observed": [],
+      "outcome": "accepted",
+      "prepared": {
+        "budget": {
+          "availableChars": 142597,
+          "charsPerToken": 4.0,
+          "contextTokens": 163840,
+          "fixedChars": 763,
+          "perRepresentationChars": 142597,
+          "represented": 1,
+          "reservedOutputTokens": 128000,
+          "source": "profile"
+        },
+        "parts": [
+          {
+            "acceptance": {
+              "decision": "reject",
+              "reason": "image/* is unsupported",
+              "rule": "image/*",
+              "source": "provider-reported"
+            },
+            "artifact": "artifact://sha256/ba7d29ba7be19467093257325ab2609730b9245bce80028e52915ddf3cb25272",
+            "budgetChars": 142597,
+            "contentRead": true,
+            "decision": "represent",
+            "delivery": {
+              "chars": 8758,
+              "compactCapabilities": false,
+              "elementsIncluded": 16,
+              "inferred": [
+                "reading",
+                "reading.0",
+                "reading.1",
+                "reading.2",
+                "reading.3",
+                "reading.4",
+                "reading.5",
+                "reading.6",
+                "reading.7",
+                "reading.8",
+                "reading.9",
+                "reading.10",
+                "reading.11",
+                "reading.12",
+                "reading.13"
+              ],
+              "omitted": {
+                "elements": [],
+                "reasons": [],
+                "sections": []
+              },
+              "visualOnly": [
+                "image"
+              ]
+            },
+            "inspection": {
+              "bytes": 80956,
+              "class": "image",
+              "declaredMismatch": false,
+              "declaredName": "invoices.png",
+              "digest": "sha256:15b81b83902b4c53bd08f121145633089af221c168fecfeaf267dcbe8cf86b9f",
+              "dimensions": [
+                480,
+                356
+              ],
+              "index": 0,
+              "mediaType": "image/png",
+              "origin": "path"
+            },
+            "reason": "model does not accept it: image/* is unsupported (ProviderReported)",
+            "reused": false,
+            "steps": [
+              {
+                "candidates": [
+                  {
+                    "capability": "representation.retrieve",
+                    "provider": "xeet",
+                    "score": 1,
+                    "version": "0.1"
+                  }
+                ],
+                "inputDigest": "sha256:3dbc74d82c0560c068f83cc599ed2bf5c676d8f59465fc21cfe2da30615e29cb",
+                "ok": true,
+                "purpose": "reuse",
+                "query": {
+                  "accepts": [],
+                  "has": [
+                    "application/json"
+                  ],
+                  "limit": null,
+                  "outcome": null,
+                  "source": null
+                },
+                "resultDigest": "sha256:534dc607abe2f9230269f9a20609ab0a431f38ec0d7a51c345c95c516b0213b3",
+                "selected": {
+                  "capability": "representation.retrieve",
+                  "provider": "xeet",
+                  "score": 1,
+                  "version": "0.1"
+                },
+                "skipped": []
+              },
+              {
+                "candidates": [
+                  {
+                    "capability": "representation.capture",
+                    "provider": "xeet",
+                    "score": 11,
+                    "version": "0.1"
+                  }
+                ],
+                "inputDigest": "sha256:5902039d36dc595ef60973a841e7febd2bcf747a5b4ec13b33c31da7df4b95d9",
+                "notProvided": [
+                  {
+                    "alternative": "use an external vision or OCR provider, then record its reading with representation.annotate, where it stays marked as inference",
+                    "matched": "understand an arbitrary screenshot or image file",
+                    "provider": "xeet",
+                    "why": "the provider builds representations from source data; it does not interpret pixels it did not render, and would only be guessing"
+                  }
+                ],
+                "ok": true,
+                "purpose": "ingest",
+                "query": {
+                  "accepts": [
+                    "application/vnd.xeet-artifact+ref",
+                    "application/json"
+                  ],
+                  "has": [
+                    "image/png"
+                  ],
+                  "limit": null,
+                  "outcome": "represent an image file",
+                  "source": null
+                },
+                "resultDigest": "sha256:e85ff54bf6ae4cfa41ecc51d05b0dd0e0011b58b423da15c42fa5fc52a2900cf",
+                "selected": {
+                  "capability": "representation.capture",
+                  "provider": "xeet",
+                  "score": 11,
+                  "version": "0.1"
+                },
+                "skipped": []
+              },
+              {
+                "candidates": [],
+                "inputDigest": "sha256:e6ab60f1e5e1f15532dbc648c825899ea767feb7c31450b6f48d78d7b68a50d9",
+                "ok": true,
+                "purpose": "validate",
+                "query": {
+                  "artifact": "sha256:a3b6cb57c872339506c32a181e2d98fad378c71e29c8880d86efb531c7fa328e"
+                },
+                "resultDigest": "sha256:35f25dfff2ffaf067fafc9e050e9294b7282d70ba3b552c370665f864e468a75",
+                "selected": {
+                  "capability": "representation.inspect",
+                  "provider": "xeet",
+                  "score": 0,
+                  "version": "0.1"
+                },
+                "skipped": []
+              },
+              {
+                "candidates": [
+                  {
+                    "capability": "vision.read",
+                    "provider": "model-reader:openai/gpt-4o-mini",
+                    "score": 16,
+                    "version": "0.1"
+                  }
+                ],
+                "inputDigest": "sha256:87a3c2b239c26c328072b9c512ae61c415bb3c25761f3bb718fe848bb7a89509",
+                "notProvided": [
+                  {
+                    "alternative": "use an external vision or OCR provider, then record its reading with representation.annotate, where it stays marked as inference",
+                    "matched": "read text from a photo",
+                    "provider": "xeet",
+                    "why": "the provider builds representations from source data; it does not interpret pixels it did not render, and would only be guessing"
+                  }
+                ],
+                "ok": true,
+                "purpose": "read",
+                "query": {
+                  "accepts": [],
+                  "has": [
+                    "image/png"
+                  ],
+                  "limit": null,
+                  "outcome": "read text from an image",
+                  "source": null
+                },
+                "resultDigest": "sha256:2b99f2ebf6c553c0abbfbb65268ee3655358876717c68903173e59a710516c71",
+                "selected": {
+                  "capability": "vision.read",
+                  "provider": "model-reader:openai/gpt-4o-mini",
+                  "score": 16,
+                  "version": "0.1"
+                },
+                "skipped": []
+              },
+              {
+                "candidates": [
+                  {
+                    "capability": "representation.annotate",
+                    "provider": "xeet",
+                    "score": 1,
+                    "version": "0.1"
+                  }
+                ],
+                "inputDigest": "sha256:099ffd562375409f7bc39fd49f308f5042df16dacb045569773b58b278280b72",
+                "ok": true,
+                "purpose": "annotate",
+                "query": {
+                  "accepts": [],
+                  "has": [
+                    "application/vnd.xeet-artifact+ref"
+                  ],
+                  "limit": null,
+                  "outcome": null,
+                  "source": null
+                },
+                "resultDigest": "sha256:4d66406f549d19c832eb2ed3750b7192b444804ec17bd3110f1443f0e0fce3bd",
+                "selected": {
+                  "capability": "representation.annotate",
+                  "provider": "xeet",
+                  "score": 1,
+                  "version": "0.1"
+                },
+                "skipped": []
+              },
+              {
+                "candidates": [],
+                "inputDigest": "sha256:96b9358f3681df6d7f30d68031607af0a3aea767c339b8403e5f8a50274be7aa",
+                "ok": true,
+                "purpose": "validate",
+                "query": {
+                  "artifact": "sha256:ba7d29ba7be19467093257325ab2609730b9245bce80028e52915ddf3cb25272"
+                },
+                "resultDigest": "sha256:753856319a1b23d4244cd2c801db767dec983f34e8857e9fe38227a6b4ca1584",
+                "selected": {
+                  "capability": "representation.inspect",
+                  "provider": "xeet",
+                  "score": 0,
+                  "version": "0.1"
+                },
+                "skipped": []
+              },
+              {
+                "candidates": [
+                  {
+                    "capability": "representation.understand",
+                    "provider": "xeet",
+                    "score": 1,
+                    "version": "0.1"
+                  }
+                ],
+                "inputDigest": "sha256:49cad85ea6b0883e344d28a748438ade68bf5f73dac51aeccb1875cb81dd5d15",
+                "ok": true,
+                "purpose": "project",
+                "query": {
+                  "accepts": [
+                    "text/plain"
+                  ],
+                  "has": [
+                    "application/vnd.xeet-artifact+ref"
+                  ],
+                  "limit": null,
+                  "outcome": null,
+                  "source": null
+                },
+                "resultDigest": "sha256:186adae110bb869c173d5c53ccf7687978c150de1eb954fbeb71535b09149b91",
+                "selected": {
+                  "capability": "representation.understand",
+                  "provider": "xeet",
+                  "score": 1,
+                  "version": "0.1"
+                },
+                "skipped": []
+              }
+            ]
+          }
+        ],
+        "requestDigest": "sha256:6937695c1f556d789f9ec96360c4b02a03c22d569cf750db42510624a8ad36c5",
+        "requestSummary": [
+          {
+            "chars": 63,
+            "sha256": "sha256:33c349089c2cc22f3cd88eae8c18cbbd5cf86cefc0a680ed31f63be94d3cf384",
+            "type": "text"
+          },
+          {
+            "chars": 9452,
+            "sha256": "sha256:422a9a72e4386a9cf6b90f31964631d37336692cb5fc53fe97469b92324e4326",
+            "type": "text"
+          }
+        ]
+      }
+    }
+  ],
+  "fallback": {
+    "triggered": false
+  },
+  "format": "modality-gateway.record",
+  "id": "sha256:0cd1617cfc566af199ef33f90aacb0a90f4709329397657db00bdc5e72a7eebf",
+  "instructionChars": 63,
+  "instructionDigest": "sha256:33c349089c2cc22f3cd88eae8c18cbbd5cf86cefc0a680ed31f63be94d3cf384",
+  "model": {
+    "declared": [
+      {
+        "evidence": "ai-gateway /v1/models: \"text\" listed in modalities.input [\"text\"]",
+        "mediaType": "text/plain",
+        "source": "provider-reported",
+        "support": "supported"
+      },
+      {
+        "evidence": "ai-gateway /v1/models: \"image\" not listed in modalities.input [\"text\"]",
+        "mediaType": "image/*",
+        "source": "provider-reported",
+        "support": "unsupported"
+      },
+      {
+        "evidence": "ai-gateway /v1/models: \"pdf\" not listed in modalities.input [\"text\"]",
+        "mediaType": "application/pdf",
+        "source": "provider-reported",
+        "support": "unsupported"
+      },
+      {
+        "evidence": "ai-gateway /v1/models: \"audio\" not listed in modalities.input [\"text\"]",
+        "mediaType": "audio/*",
+        "source": "provider-reported",
+        "support": "unsupported"
+      },
+      {
+        "evidence": "ai-gateway /v1/models: \"video\" not listed in modalities.input [\"text\"]",
+        "mediaType": "video/*",
+        "source": "provider-reported",
+        "support": "unsupported"
+      }
+    ],
+    "model": "deepseek/deepseek-v3.1",
+    "observed": [],
+    "profileDigest": "sha256:e5dde960a49d6206bfffb92b94076d74b78893fa26e1bc86be6f6a37cf82ee9d",
+    "profileSource": "provider-reported",
+    "provider": "ai-gateway",
+    "revision": "released:1755734400"
+  },
+  "providers": [
+    {
+      "id": "xeet",
+      "version": "0.1.0"
+    },
+    {
+      "id": "model-reader:openai/gpt-4o-mini",
+      "version": "0.1.0"
+    }
+  ],
+  "result": "accepted",
+  "version": "0.1"
+}

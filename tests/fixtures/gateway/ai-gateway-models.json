@@ -1,0 +1,108 @@
+{
+  "_recorded": "GET https://ai-gateway.vercel.sh/v1/models, 2026-11-16, selected fields of selected models",
+  "data": [
+    {
+      "id": "deepseek/deepseek-v3.1",
+      "type": "language",
+      "modalities": {
+        "input": [
+          "text"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "context_window": 163840,
+      "max_tokens": 128000,
+      "tags": [
+        "implicit-caching",
+        "reasoning",
+        "tool-use",
+        "structured-output",
+        "open-weights"
+      ]
+    },
+    {
+      "id": "amazon/nova-micro",
+      "type": "language",
+      "modalities": {
+        "input": [
+          "text"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "context_window": 128000,
+      "max_tokens": 8192,
+      "tags": [
+        "tool-use",
+        "structured-output"
+      ]
+    },
+    {
+      "id": "meta/llama-3.1-8b",
+      "type": "language",
+      "modalities": {
+        "input": [
+          "text"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "context_window": 128000,
+      "max_tokens": 8192,
+      "tags": [
+        "tool-use",
+        "open-weights",
+        "structured-output"
+      ]
+    },
+    {
+      "id": "mistral/ministral-3b",
+      "type": "language",
+      "modalities": {
+        "input": [
+          "text",
+          "image"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "context_window": 131072,
+      "max_tokens": 4000,
+      "tags": [
+        "tool-use",
+        "vision",
+        "open-weights"
+      ]
+    },
+    {
+      "id": "openai/gpt-4o-mini",
+      "type": "language",
+      "modalities": {
+        "input": [
+          "text",
+          "image",
+          "pdf"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "context_window": 128000,
+      "max_tokens": 16384,
+      "tags": [
+        "file-input",
+        "implicit-caching",
+        "tool-use",
+        "vision",
+        "web-search",
+        "structured-output",
+        "fast"
+      ]
+    }
+  ]
+}

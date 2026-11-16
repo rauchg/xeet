@@ -1,0 +1,15 @@
+{
+  "_recorded": "POST https://ai-gateway.vercel.sh/v1/chat/completions, model meta/llama-3.1-8b, a 1x1 PNG image_url part; HTTP 400; TOP-LEVEL error object only. The full body (ai-gateway-400-llama-3.1-8b-image-full.json) shows the gateway tried bedrock (\"doesn't support the image content block\") and then novita (\"Bad Request\"); this truncated form keeps only the last message.",
+  "error": {
+    "message": "Bad Request",
+    "type": "AI_APICallError",
+    "param": {
+      "error": "Bad Request",
+      "statusCode": 400,
+      "name": "AI_APICallError",
+      "message": "Bad Request",
+      "isRetryable": false,
+      "type": "AI_APICallError"
+    }
+  }
+}

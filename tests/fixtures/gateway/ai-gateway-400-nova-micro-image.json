@@ -1,0 +1,15 @@
+{
+  "_recorded": "POST https://ai-gateway.vercel.sh/v1/chat/completions, model amazon/nova-micro, a 1x1 PNG image_url part; HTTP 400; error object only",
+  "error": {
+    "message": "This model doesn't support the image content block that you provided. Update the content block and try again.",
+    "type": "AI_APICallError",
+    "param": {
+      "error": "This model doesn't support the image content block that you provided. Update the content block and try again.",
+      "statusCode": 400,
+      "name": "AI_APICallError",
+      "message": "This model doesn't support the image content block that you provided. Update the content block and try again.",
+      "isRetryable": false,
+      "type": "AI_APICallError"
+    }
+  }
+}

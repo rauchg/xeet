@@ -266,3 +266,138 @@ impl ModelProfile {
         });
     }
 }
+
+/// A profile from Vercel AI Gateway's model metadata (`GET /v1/models`, one
+/// entry). Listed input modalities become `supported`; the common families it
+/// does not list become `unsupported`; both are `provider-reported`. A host
+/// can still override any rule with [`ModelProfile::with_host_config`].
+pub fn from_ai_gateway(entry: &serde_json::Value) -> Result<ModelProfile, String> {
+    let id = entry["id"].as_str().ok_or("model entry has no id")?;
+    let listed: Vec<&str> = entry["modalities"]["input"]
+        .as_array()
+        .ok_or_else(|| format!("{id}: no modalities.input in the metadata"))?
+        .iter()
+        .filter_map(|v| v.as_str())
+        .collect();
+    let rule = |mt: &str, support: Support, evidence: String| InputSupport {
+        media_type: mt.into(),
+        support,
+        source: InfoSource::ProviderReported,
+        max_bytes: None,
+        max_width: None,
+        max_height: None,
+        condition: None,
+        evidence: Some(evidence),
+    };
+    let mut inputs = Vec::new();
+    for (name, mt) in [
+        ("text", "text/plain"),
+        ("image", "image/*"),
+        ("pdf", "application/pdf"),
+        ("audio", "audio/*"),
+        ("video", "video/*"),
+    ] {
+        let (support, how) = if listed.contains(&name) {
+            (Support::Supported, "listed")
+        } else {
+            (Support::Unsupported, "not listed")
+        };
+        inputs.push(rule(
+            mt,
+            support,
+            format!("ai-gateway /v1/models: \"{name}\" {how} in modalities.input {listed:?}"),
+        ));
+    }
+    Ok(ModelProfile {
+        format: PROFILE_FORMAT.into(),
+        version: PROFILE_VERSION.into(),
+        provider: "ai-gateway".into(),
+        model: id.into(),
+        revision: entry["released"].as_i64().map(|r| format!("released:{r}")),
+        inputs,
+        context_tokens: entry["context_window"].as_u64(),
+        max_output_tokens: entry["max_tokens"].as_u64(),
+        chars_per_token: None,
+        structured_input: if entry["tags"]
+            .as_array()
+            .is_some_and(|t| t.iter().any(|x| x == "structured-output"))
+        {
+            Support::Supported
+        } else {
+            Support::Unknown
+        },
+        source: InfoSource::ProviderReported,
+        notes: vec!["generated from Vercel AI Gateway model metadata".into()],
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn profiles_from_recorded_ai_gateway_metadata() {
+        let v: serde_json::Value = serde_json::from_str(
+            &std::fs::read_to_string(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../tests/fixtures/gateway/ai-gateway-models.json"
+            ))
+            .unwrap(),
+        )
+        .unwrap();
+        let get = |id: &str| {
+            from_ai_gateway(
+                v["data"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .find(|m| m["id"] == id)
+                    .unwrap(),
+            )
+            .unwrap()
+        };
+        let ds = get("deepseek/deepseek-v3.1");
+        assert!(ds.validate().is_empty());
+        assert!(matches!(
+            ds.accepts("image/png", 100, Some((1, 1))),
+            Acceptance::Reject {
+                source: InfoSource::ProviderReported,
+                ..
+            }
+        ));
+        assert!(matches!(
+            ds.accepts("text/plain", 10, None),
+            Acceptance::Accept { .. }
+        ));
+        assert_eq!(ds.context_tokens, Some(163840));
+        let mini = get("openai/gpt-4o-mini");
+        assert!(matches!(
+            mini.accepts("image/png", 100, Some((1, 1))),
+            Acceptance::Accept { .. }
+        ));
+        assert!(matches!(
+            mini.accepts("audio/mpeg", 100, None),
+            Acceptance::Reject { .. }
+        ));
+        // The host overrides provider metadata.
+        let mut host = ds.clone();
+        host.inputs = vec![InputSupport {
+            media_type: "image/*".into(),
+            support: Support::Supported,
+            source: InfoSource::Configured,
+            max_bytes: None,
+            max_width: None,
+            max_height: None,
+            condition: None,
+            evidence: None,
+        }];
+        let merged = ds.with_host_config(&host);
+        assert!(matches!(
+            merged.accepts("image/png", 1, None),
+            Acceptance::Accept {
+                source: InfoSource::Configured,
+                ..
+            }
+        ));
+    }
+}

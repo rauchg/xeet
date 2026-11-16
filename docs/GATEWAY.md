@@ -69,7 +69,9 @@ characters-per-token estimate, structured-input support. There is no built-in
 table of vendor models: support is never inferred from a name. The host's
 configuration overrides provider metadata (`with_host_config`). Unknown support
 is transformed by default (`UnknownPolicy::Transform`) or sent and left to the
-fallback (`Send`). Examples: `tests/fixtures/gateway/profile-*.json`.
+fallback (`Send`). Examples: `tests/fixtures/gateway/profile-*.json`. `from_ai_gateway` builds a
+`provider-reported` profile from Vercel AI Gateway's `/v1/models` metadata
+(`xeet gateway profile ai-gateway:MODEL`).
 
 ## What a text-only model receives
 
@@ -156,19 +158,57 @@ MCP (`crates/xeet-cli/tests/artifact_cli.rs`): an agent discovers
 `modality.adapt` from "the model does not support images" with
 `accepts: ["text/plain"]`, invokes it, and receives only text blocks.
 
-## Live check against a real provider
+## Live runs against real models (Vercel AI Gateway)
 
-With the `OPENAI_API_KEY` available in this environment,
-`xeet gateway run --client openai` sent a real request with the PNG to
-`gpt-4o-mini` (profile configured as image-capable). The API answered
-`HTTP 429 insufficient_quota` (the account has no credits). The gateway
-classified it as **quota**, did not fall back, and recorded the run as
-`rejected`. That body is the fixture
-`tests/fixtures/gateway/openai-429-insufficient-quota.json`.
+With the session's `AI_GATEWAY_API_KEY`, every piece ran for real; records,
+answers and the delivered artifact are in
+[`evidence/gateway-live-2026-11-16/`](evidence/gateway-live-2026-11-16/).
 
-Not verified live: a successful completion, a real modality rejection's exact
-text (the modality phrases come from public error texts), and any real vision
-reader. These need a funded model account and a vision provider.
+```bash
+xeet gateway run --client ai-gateway \
+  --model ai-gateway:deepseek/deepseek-v3.1 \
+  --reader ai-gateway:openai/gpt-4o-mini \
+  --grant store:read,store:write,fs:read,vision:read --allow-read tests \
+  --attach tests/fixtures/gateway/invoices.png \
+  --instruction "Look at this screenshot and tell me which invoices are overdue."
+```
+
+`--model ai-gateway:…` builds the target profile from the gateway's model
+metadata; `--reader ai-gateway:…` adds a real `vision.read` provider, used
+only because `--grant` includes `vision:read`.
+
+| run | target model | what happened |
+|---|---|---|
+| 1 | deepseek/deepseek-v3.1 (text-only, provider-reported) | ingest → read by gpt-4o-mini → annotate → project; answered INV-1041, INV-1043, and INV-1045 noting its status is cut off |
+| 2 | same, host config wrongly claims images | real 400 `does not accept image input` → one fallback → reused the reading → answered |
+| 3 | openai/gpt-4o-mini (vision) | original image sent; answered directly |
+| 4 | meta/llama-3.1-8b, wrong host config | real 400; matched evidence `doesn't support the image content block` → one fallback → answered |
+| 5 | amazon/nova-micro (text-only) | reused run 1's reading, no second vision call; answered |
+
+What the live runs taught, and what changed because of them:
+
+- **The classifier was wrong before it saw real errors.** The phrases taken
+  from public error texts matched neither real rejection (DeepSeek: "does not
+  accept image input"; Nova: "doesn't support the image content block").
+  Both are now rules citing their recorded fixtures.
+- **The top-level message can hide the cause.** For Llama the gateway's
+  top-level error is "Bad Request"; the evidence is in the routed provider
+  attempts inside the body (Bedrock refused the image, then Novita returned
+  "Bad Request"). The classifier reads the whole body and records the matched
+  phrase, so a reviewer can see where the evidence came from. A body with
+  only "Bad Request" is still not treated as a modality error.
+- **Vision readings are good at text and bad at coordinates.** gpt-4o-mini
+  transcribed every line correctly and marked the cut-off "Overd..." as
+  uncertain, but placed every row about 85 px too high at self-reported
+  confidence 1.0. The reader's contract now says so; boxes and confidences stay
+  `!inferred`.
+- **Other real non-modality errors** were recorded and are classified without
+  fallback: OpenAI 429 `insufficient_quota`, AI Gateway 403 free-tier
+  restriction.
+
+Recorded fixtures: `tests/fixtures/gateway/ai-gateway-*.json`,
+`openai-429-insufficient-quota.json`. Test fixtures are classified on what
+the provider sent only (the `_recorded` notes are stripped first).
 
 ## Measurements (optimized build, this container)
 
@@ -179,14 +219,19 @@ reader. These need a funded model account and a vision provider.
 | text-only, without reader | 2,633 chars |
 | prepare, fresh (reuse miss, ingest, read, annotate, 3 validations, project) | 9.9 ms |
 | prepare, reused (lookup, validation, project) | 1.7 ms |
+| live run 1, end to end (ingest, real vision read, text model answer) | 18.4 s |
+| live runs 2, 4, 5 (reading reused; fallback included in 2 and 4) | 1.8–4.3 s |
 
 ## Not done
 
-- No vision provider ships here; `vision.read` is implemented only by the test
-  stand-in. Any provider declaring that contract is used without code changes.
+- One real reader: `ModelReader` over an OpenAI-compatible endpoint. Any other
+  provider declaring `vision.read` is used without gateway changes.
 - Ingest supports images only; PDFs, audio and video are reported as not
-  deliverable.
+  deliverable (several gateway models accept them natively; the gateway
+  passes them through to those models).
 - Token counts are estimates from a configured ratio, not a tokenizer.
 - No HTTP transport; the gateway is a Rust API, a CLI, and an MCP-discoverable
   contract (`modality.adapt`, which prepares content and never sends it).
 - Observed rejections are not persisted to the host profile automatically.
+- Live runs are not part of `cargo test` (they need a key, cost money and are
+  non-deterministic); their records are committed as evidence instead.

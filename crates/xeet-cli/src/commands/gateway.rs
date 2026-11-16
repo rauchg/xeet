@@ -2,12 +2,15 @@
 //!
 //! `prepare` builds the model request a target model can consume and prints
 //! it with the decision record (media elided to sizes). `run` also sends it
-//! through a model client — today `openai`, over curl, with the key read from
-//! `OPENAI_API_KEY` and passed to curl on stdin, never on the command line.
+//! through an OpenAI-compatible client: the OpenAI API or Vercel AI Gateway,
+//! over curl, with the key read from the environment and passed to curl on
+//! stdin, never on the command line.
 //!
-//! Providers here: this binary's engine. A vision provider is not built in;
-//! without one, images are represented by what can be proven (format,
-//! dimensions, digest) and their content is declared unknown.
+//! Providers: this binary's engine, plus — with `--reader ai-gateway:MODEL` —
+//! a vision reader backed by that model. The reader is invoked only when the
+//! host also grants `vision:read`. Without a reader, images are represented by
+//! what can be proven (format, dimensions, digest) and their content is
+//! declared unknown.
 
 use super::*;
 
@@ -20,15 +23,18 @@ use xeet_gateway::model::ModelProfile;
 use xeet_gateway::request::Content;
 
 pub const USAGE: &str = "\
-gateway prepare --model PROFILE.json [--host-config PROFILE.json] --instruction TEXT
-                [--attach PATH,…] [--artifact ID,…] [session options] [--record FILE]
+gateway prepare --model PROFILE.json|ai-gateway:MODEL [--host-config PROFILE.json]
+                --instruction TEXT [--attach PATH,…] [--artifact ID,…]
+                [--reader ai-gateway:MODEL] [session options] [--record FILE]
                                          the model request a target model can consume,
                                          plus the decision record (no content in it)
-gateway run … --client openai [--max-tokens N]
+gateway run … --client openai|ai-gateway [--max-tokens N]
                                          prepare and send; on a confirmed modality
                                          rejection, re-prepare once and resend
+gateway profile ai-gateway:MODEL         a capability profile from AI Gateway metadata
 gateway expand ARTIFACT [--focus ID] [--sections a,b] [--max-chars N] [session options]
-                                         more of an artifact, for a follow-up turn";
+                                         more of an artifact, for a follow-up turn
+A --reader is used only if --grant includes vision:read.";
 
 const KNOWN: &[&str] = &[
     "model",
@@ -42,6 +48,7 @@ const KNOWN: &[&str] = &[
     "record",
     "client",
     "max-tokens",
+    "reader",
     "focus",
     "sections",
     "max-chars",
@@ -66,6 +73,10 @@ pub fn run(argv: &[String]) -> u8 {
     let r = match pos.as_slice() {
         ["prepare"] => go(&args, false),
         ["run"] => go(&args, true),
+        ["profile", spec] => load_profile(spec).map(|p| {
+            println!("{}", serde_json::to_string_pretty(&p).unwrap());
+            EXIT_OK
+        }),
         ["expand", artifact] => expand(&args, artifact),
         _ => return usage("unknown gateway subcommand"),
     };
@@ -126,14 +137,36 @@ fn engine(args: &Args) -> Result<Engine, String> {
 }
 
 fn read_profile(path: &str) -> Result<ModelProfile, String> {
-    let p: ModelProfile =
-        serde_json::from_slice(&std::fs::read(path).map_err(|e| format!("{path}: {e}"))?)
-            .map_err(|e| format!("{path}: {e}"))?;
+    let bytes = std::fs::read(path).map_err(|e| format!("{path}: {e}"))?;
+    let p: ModelProfile = serde_json::from_slice(&bytes).map_err(|e| format!("{path}: {e}"))?;
     let problems = p.validate();
     if !problems.is_empty() {
         return Err(format!("{path}: {}", problems.join("; ")));
     }
     Ok(p)
+}
+
+/// `ai-gateway:MODEL` → a profile from Vercel AI Gateway's metadata
+/// (provider-reported); anything else is a profile file.
+fn load_profile(spec: &str) -> Result<ModelProfile, String> {
+    let Some(id) = spec.strip_prefix("ai-gateway:") else {
+        return read_profile(spec);
+    };
+    let (status, body) = Curl {
+        key_env: "AI_GATEWAY_API_KEY",
+    }
+    .call("https://ai-gateway.vercel.sh/v1/models", None)?;
+    if status != 200 {
+        return Err(format!("ai-gateway /v1/models: HTTP {status}"));
+    }
+    let v: Value = serde_json::from_str(&body).map_err(|e| e.to_string())?;
+    let entry = v["data"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .find(|m| m["id"] == id)
+        .ok_or_else(|| format!("ai-gateway lists no model {id}"))?;
+    xeet_gateway::model::from_ai_gateway(entry)
 }
 
 /// The request with media replaced by their sizes, for printing.
@@ -150,10 +183,10 @@ fn redacted(req: &xeet_gateway::ModelRequest) -> Value {
 }
 
 fn go(args: &Args, send: bool) -> Result<u8, String> {
-    let mut profile = read_profile(
-        args.value("model")
-            .ok_or("--model PROFILE.json is required")?,
-    )?;
+    let spec = args
+        .value("model")
+        .ok_or("--model PROFILE.json or ai-gateway:MODEL is required")?;
+    let mut profile = load_profile(spec)?;
     if let Some(h) = args.value("host-config") {
         profile = profile.with_host_config(&read_profile(h)?);
     }
@@ -175,7 +208,26 @@ fn go(args: &Args, send: bool) -> Result<u8, String> {
         inputs,
     };
     let e = engine(args)?;
-    let g = Gateway::new(vec![&e as &dyn Provider]);
+    let reader = match args.value("reader") {
+        Some(spec) => {
+            let model = spec
+                .strip_prefix("ai-gateway:")
+                .ok_or("--reader takes ai-gateway:MODEL")?;
+            Some(xeet_gateway::reader::ModelReader::new(
+                model,
+                xeet_gateway::openai::AI_GATEWAY_ENDPOINT,
+                Curl {
+                    key_env: "AI_GATEWAY_API_KEY",
+                },
+            ))
+        }
+        None => None,
+    };
+    let mut providers: Vec<&dyn Provider> = vec![&e];
+    if let Some(r) = &reader {
+        providers.push(r);
+    }
+    let g = Gateway::new(providers);
     let s = session(args);
     let t = now();
     if !send {
@@ -185,21 +237,31 @@ fn go(args: &Args, send: bool) -> Result<u8, String> {
                 println!("{text}\n");
             }
         }
-        let out = json!({"request": redacted(&p.request), "prepared": p});
-        write_record(args, &out)?;
+        write_record(
+            args,
+            &json!({"request": redacted(&p.request), "prepared": p}),
+        )?;
         return Ok(EXIT_OK);
     }
-    let client = args.value("client").ok_or("run needs --client (openai)")?;
-    if client != "openai" {
-        return Err(format!("unknown client {client}"));
-    }
+    let (endpoint, key_env) = match args
+        .value("client")
+        .ok_or("run needs --client (openai or ai-gateway)")?
+    {
+        "openai" => (xeet_gateway::openai::ENDPOINT, "OPENAI_API_KEY"),
+        "ai-gateway" => (
+            xeet_gateway::openai::AI_GATEWAY_ENDPOINT,
+            "AI_GATEWAY_API_KEY",
+        ),
+        other => return Err(format!("unknown client {other}")),
+    };
     let max = args
         .value("max-tokens")
         .map(|v| v.parse().map_err(|_| "--max-tokens needs a number"))
         .transpose()?;
     let mut c = xeet_gateway::openai::Client {
-        transport: Curl,
-        max_completion_tokens: max.or(Some(300)),
+        transport: Curl { key_env },
+        endpoint: endpoint.into(),
+        max_completion_tokens: max.or(Some(400)),
     };
     let run = g.run(&task, &profile, &mut c, &s, &t);
     match &run.response {
@@ -260,21 +322,35 @@ fn expand(args: &Args, artifact: &str) -> Result<u8, String> {
 }
 
 /// HTTPS through the system `curl`, which honors this host's proxy and CA
-/// configuration. The key travels on curl's stdin config, not in argv.
-struct Curl;
+/// configuration. The key (read from `key_env`) travels on curl's stdin
+/// config, never in argv.
+struct Curl {
+    key_env: &'static str,
+}
 
-impl xeet_gateway::openai::Transport for Curl {
-    fn post_json(&mut self, url: &str, body: &str) -> Result<(u16, String), String> {
+impl Curl {
+    fn call(&self, url: &str, body: Option<&str>) -> Result<(u16, String), String> {
         use std::io::Write as _;
         let key =
-            std::env::var("OPENAI_API_KEY").map_err(|_| "OPENAI_API_KEY is not set".to_string())?;
-        let file =
-            std::env::temp_dir().join(format!("xeet-gateway-body-{}.json", std::process::id()));
-        std::fs::write(&file, body).map_err(|e| e.to_string())?;
-        let config = format!(
-            "url = \"{url}\"\nheader = \"Authorization: Bearer {key}\"\nheader = \"Content-Type: application/json\"\ndata-binary = \"@{}\"\nwrite-out = \"\\n%{{http_code}}\"\nsilent\nshow-error\nmax-time = 120\n",
-            file.display()
+            std::env::var(self.key_env).map_err(|_| format!("{} is not set", self.key_env))?;
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0);
+        let file = std::env::temp_dir().join(format!(
+            "xeet-gateway-body-{}-{nanos}.json",
+            std::process::id()
+        ));
+        let mut config = format!(
+            "url = \"{url}\"\nheader = \"Authorization: Bearer {key}\"\nwrite-out = \"\\n%{{http_code}}\"\nsilent\nshow-error\nmax-time = 180\n"
         );
+        if let Some(b) = body {
+            std::fs::write(&file, b).map_err(|e| e.to_string())?;
+            config.push_str(&format!(
+                "header = \"Content-Type: application/json\"\ndata-binary = \"@{}\"\n",
+                file.display()
+            ));
+        }
         let mut child = std::process::Command::new("curl")
             .args(["-K", "-"])
             .stdin(std::process::Stdio::piped())
@@ -302,5 +378,11 @@ impl xeet_gateway::openai::Transport for Curl {
             code.trim().parse().map_err(|_| "bad status from curl")?,
             body.to_string(),
         ))
+    }
+}
+
+impl xeet_gateway::openai::Transport for Curl {
+    fn post_json(&mut self, url: &str, body: &str) -> Result<(u16, String), String> {
+        self.call(url, Some(body))
     }
 }

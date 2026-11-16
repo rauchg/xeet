@@ -26,6 +26,7 @@ pub mod inspect;
 pub mod model;
 pub mod openai;
 pub mod provider;
+pub mod reader;
 pub mod request;
 
 pub use gateway::{Gateway, Options, Run, RunRecord, Task, UnknownPolicy};

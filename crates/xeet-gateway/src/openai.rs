@@ -1,4 +1,6 @@
-//! OpenAI Chat Completions as one concrete [`ModelClient`].
+//! OpenAI-compatible Chat Completions as one concrete [`ModelClient`]: the
+//! OpenAI API itself, or Vercel AI Gateway (verified live in this repository:
+//! see docs/GATEWAY.md).
 //!
 //! Only the encoding and response handling live here; bytes move through an
 //! injected [`Transport`], so this crate opens no sockets and holds no keys.
@@ -15,6 +17,8 @@ use serde_json::{json, Value};
 use crate::request::{Content, ModelClient, ModelRequest, ModelResponse, ProviderError, Role};
 
 pub const ENDPOINT: &str = "https://api.openai.com/v1/chat/completions";
+/// Vercel AI Gateway's OpenAI-compatible endpoint (same request encoding).
+pub const AI_GATEWAY_ENDPOINT: &str = "https://ai-gateway.vercel.sh/v1/chat/completions";
 
 pub trait Transport {
     /// POSTs JSON; returns the HTTP status and body, or a transport error.
@@ -55,6 +59,8 @@ pub fn encode(req: &ModelRequest, max_completion_tokens: Option<u64>) -> Result<
 
 pub struct Client<T: Transport> {
     pub transport: T,
+    /// An OpenAI-compatible chat completions URL ([`ENDPOINT`], [`AI_GATEWAY_ENDPOINT`]).
+    pub endpoint: String,
     pub max_completion_tokens: Option<u64>,
 }
 
@@ -67,7 +73,7 @@ impl<T: Transport> ModelClient for Client<T> {
         })?;
         let (status, text) = self
             .transport
-            .post_json(ENDPOINT, &body.to_string())
+            .post_json(&self.endpoint, &body.to_string())
             .map_err(|e| ProviderError {
                 status: None,
                 body: e,
