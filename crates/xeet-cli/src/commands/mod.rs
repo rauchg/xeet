@@ -18,7 +18,11 @@
 //! | 4 | the render itself failed (HTTP 5xx) |
 //! | 5 | could not read or write a file |
 
+pub mod artifact;
+pub mod capture;
+pub mod engine;
 pub mod explain;
+pub mod gateway;
 pub mod render;
 pub mod resolve;
 pub mod serve;
@@ -39,7 +43,9 @@ pub const EXIT_RENDER: u8 = 4;
 pub const EXIT_IO: u8 = 5;
 
 /// The commands this module implements, in the order `--help` lists them.
-pub const COMMANDS: &[&str] = &["render", "explain", "sheet", "resolve", "serve"];
+pub const COMMANDS: &[&str] = &[
+    "render", "explain", "sheet", "resolve", "serve", "artifact", "engine", "gateway", "capture",
+];
 
 /// True when `name` is one of [`COMMANDS`].
 pub fn is_command(name: &str) -> bool {
@@ -154,6 +160,14 @@ pub fn dispatch(name: &str, args: &[String]) -> u8 {
         // The resolver (`xeet resolve`): the same crate the playground and the
         // WASM package call, with the default native host.
         "resolve" => resolve::run(args),
+        // Durable artifacts: capture, inspect, verify, compare, project.
+        "artifact" => artifact::run(args),
+        // The representation engine as a provider: manifest, discovery, MCP.
+        "engine" => engine::run(args),
+        // The modality gateway: model-consumable requests from any input.
+        "gateway" => gateway::run(args),
+        // Screenshots: durable artifact + local OCR, the native app's entry point.
+        "capture" => capture::run(args),
         _ => {
             eprintln!("xeet: unknown command `{name}`");
             eprintln!("{}", usage_for("xeet"));
@@ -216,9 +230,34 @@ resolve:
 serve --stdio:                        one JSON request per line, one JSON reply per line
   ops: render (PNG, report, geometry), explain (report), info (version)
 
+{artifact}
+{engine}
+{gateway}
+{capture}
+
 Any command: --limits standard|unlimited (default standard), --help.
 
-Exit codes: 0 ok, 2 usage, 3 invalid input, 4 render failed, 5 I/O."
+Exit codes: 0 ok, 2 usage, 3 invalid input, 4 render failed, 5 I/O.",
+        artifact = artifact::USAGE
+            .lines()
+            .map(|l| format!("{prog} {l}"))
+            .collect::<Vec<_>>()
+            .join("\n"),
+        engine = engine::USAGE
+            .lines()
+            .map(|l| format!("{prog} {l}"))
+            .collect::<Vec<_>>()
+            .join("\n"),
+        gateway = gateway::USAGE
+            .lines()
+            .map(|l| format!("{prog} {l}"))
+            .collect::<Vec<_>>()
+            .join("\n"),
+        capture = capture::USAGE
+            .lines()
+            .map(|l| format!("{prog} {l}"))
+            .collect::<Vec<_>>()
+            .join("\n")
     )
 }
 
@@ -228,8 +267,23 @@ Exit codes: 0 ok, 2 usage, 3 invalid input, 4 render failed, 5 I/O."
 /// `stdio` is here for `serve --stdio` (the playground's render server): it is
 /// the only transport, and it must not swallow the next flag as its value.
 pub const BOOLEAN_FLAGS: &[&str] = &[
-    "compact", "quiet", "time", "help", "h", "version", "V", "stdio", "media", "no-media",
-    "no-links", "refresh", "offline", "expanded",
+    "compact",
+    "quiet",
+    "time",
+    "help",
+    "h",
+    "version",
+    "V",
+    "stdio",
+    "media",
+    "no-media",
+    "no-links",
+    "refresh",
+    "offline",
+    "expanded",
+    "json",
+    "no-reproduce",
+    "compact-capabilities",
 ];
 
 /// A tiny, forgiving argument parser: positional arguments plus `--flags` and

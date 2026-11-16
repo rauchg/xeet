@@ -1,0 +1,9 @@
+{
+  "text": "Two links, one card: https://vercel.com/blog/the-thing and https://github.com/vercel/next.js",
+  "author": { "name": "Guillermo Rauch", "handle": "rauchg", "verified": "blue" },
+  "links": {
+    "https://vercel.com/blog/the-thing": { "card": "summary", "title": "The thing" },
+    "https://github.com/vercel/next.js": { "card": "summary_large_image", "title": "next.js", "image": { "width": 1200, "height": 630 } }
+  },
+  "counts": { "replies": 12, "reposts": 34, "likes": 2100, "views": 98000, "bookmarks": 57 }
+}

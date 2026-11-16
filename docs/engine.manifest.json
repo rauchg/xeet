@@ -1,0 +1,1461 @@
+{
+  "authority": {
+    "scopes": [
+      {
+        "id": "store:read",
+        "meaning": "read artifacts in the provider's store"
+      },
+      {
+        "id": "store:write",
+        "meaning": "add artifacts to the store (never modify or delete)"
+      },
+      {
+        "id": "fs:read",
+        "meaning": "read files and package directories inside the read roots the host allows"
+      }
+    ],
+    "summary": "Discovery grants nothing. The host that starts the provider grants scopes for a session; every invocation checks the scopes its contract names and fails with `unauthorized` listing the missing ones. No capability acts at a source system."
+  },
+  "capabilities": [
+    {
+      "authority": [
+        "store:write"
+      ],
+      "consequential": false,
+      "constraints": {
+        "deterministic": true,
+        "maxInputBytes": 16777216,
+        "network": "none",
+        "notes": [
+          "typical latency tens of milliseconds"
+        ]
+      },
+      "description": "The caller supplies the source data inline (`data`) or as a file path inside an allowed read root (`path`); the provider never fetches. The result is stored content-addressed and verified, including byte-for-byte reproduction of its view, before it is returned.",
+      "effects": "creates-artifact",
+      "errors": [
+        "invalid_input",
+        "not_found",
+        "unauthorized",
+        "limit_exceeded",
+        "verification_failed",
+        "unsupported"
+      ],
+      "guarantees": [
+        "the stored artifact passed verification, including reproduction of its view from the preserved input",
+        "same input and capturedAt give the same artifact id",
+        "source bytes are preserved verbatim in the artifact"
+      ],
+      "id": "representation.capture",
+      "inputModalities": [
+        "application/json",
+        "image/png",
+        "image/jpeg",
+        "image/gif",
+        "image/webp"
+      ],
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "capturedAt": {
+            "description": "ISO 8601 observation time; defaults to the host clock",
+            "type": "string"
+          },
+          "context": {
+            "description": "screenshot: the capture context (method, mode, platform, display, frame, window, permissions, accessibility tree); see xeet_capture::image::CaptureContext",
+            "required": [
+              "method",
+              "mode"
+            ],
+            "type": "object"
+          },
+          "data": {
+            "description": "x.post: a model::Post or `xeet resolve` output; github.pull_request: {pull, reviews?, comments?, files?, commits?, apiVersion?} of REST responses",
+            "type": "object"
+          },
+          "dataBase64": {
+            "description": "image: the file's bytes, base64",
+            "type": "string"
+          },
+          "declaredType": {
+            "description": "image: a declared media type (recorded and checked against the bytes, not trusted)",
+            "type": "string"
+          },
+          "method": {
+            "description": "how the data was obtained: draft, source-payload, api-response, fixture",
+            "type": "string"
+          },
+          "name": {
+            "description": "image: a declared filename (recorded, not trusted)",
+            "type": "string"
+          },
+          "options": {
+            "additionalProperties": false,
+            "properties": {
+              "scale": {
+                "description": "device pixels per layout unit (default 2)",
+                "maximum": 3,
+                "minimum": 1,
+                "type": "number"
+              },
+              "surface": {
+                "description": "x.post only",
+                "enum": [
+                  "web-timeline",
+                  "web-detail",
+                  "ios-timeline",
+                  "ios-detail"
+                ]
+              },
+              "theme": {
+                "enum": [
+                  "light",
+                  "dark"
+                ]
+              },
+              "width": {
+                "description": "layout width (CSS px for x.post, default 600)",
+                "minimum": 1,
+                "type": "number"
+              }
+            },
+            "type": "object"
+          },
+          "path": {
+            "description": "a file with the same content, inside an allowed read root (needs fs:read)",
+            "type": "string"
+          },
+          "reference": {
+            "description": "x.post: the post URL, if known",
+            "type": "string"
+          },
+          "source": {
+            "enum": [
+              "x.post",
+              "github.pull_request",
+              "image",
+              "screenshot"
+            ]
+          },
+          "sourceId": {
+            "description": "x.post: the status id, if known",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source"
+        ],
+        "type": "object"
+      },
+      "limitations": [
+        "four source types today: x.post, github.pull_request, image, screenshot",
+        "image: identifies format and dimensions and keeps the bytes; does NOT read the content (visual-only until annotated)",
+        "no network: source data must be supplied",
+        "authenticity of the source data is recorded as unverified"
+      ],
+      "modes": [
+        {
+          "note": "returns a reference; use representation.understand to read it",
+          "output": [
+            "application/vnd.xeet-artifact+ref",
+            "application/json"
+          ],
+          "select": {}
+        }
+      ],
+      "outcomes": [
+        "capture an observation",
+        "make a screenshot an agent can understand",
+        "turn a post into structured data",
+        "represent a pull request",
+        "create an artifact",
+        "convert source data into a visual and semantic representation",
+        "render a post with semantics",
+        "snapshot a pull request",
+        "represent an image file",
+        "ingest an image",
+        "identify and measure an image"
+      ],
+      "outputSchema": {
+        "properties": {
+          "artifact": {
+            "description": "artifact://sha256/<hex>",
+            "type": "string"
+          },
+          "derivedFrom": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "subject": {
+            "type": "object"
+          },
+          "verification": {
+            "properties": {
+              "failed": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "ok": {
+                "type": "boolean"
+              },
+              "skipped": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "ok",
+              "failed"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "artifact",
+          "id",
+          "verification"
+        ],
+        "type": "object"
+      },
+      "preconditions": [
+        "exactly one of data, dataBase64 or path",
+        "path inputs also need fs:read and must lie inside an allowed read root"
+      ],
+      "summary": "Turn source data (an X post, a GitHub pull request, an image file) into a verified artifact: a visual view plus semantics, state, provenance, capabilities and limitations.",
+      "title": "Capture an observation as an artifact",
+      "version": "0.1"
+    },
+    {
+      "authority": [
+        "store:write",
+        "fs:read"
+      ],
+      "consequential": false,
+      "constraints": {
+        "deterministic": true,
+        "maxInputBytes": 16777216,
+        "network": "none",
+        "notes": []
+      },
+      "description": "Runs full verification, with reproduction when an adapter for the artifact is available, and refuses the package if any check fails.",
+      "effects": "creates-artifact",
+      "errors": [
+        "invalid_input",
+        "not_found",
+        "unauthorized",
+        "limit_exceeded",
+        "verification_failed",
+        "unsupported"
+      ],
+      "guarantees": [
+        "nothing failing verification enters the store"
+      ],
+      "id": "representation.ingest",
+      "inputModalities": [
+        "application/vnd.xeet-artifact+dir"
+      ],
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "type": "object"
+      },
+      "limitations": [
+        "directory packages only"
+      ],
+      "modes": [
+        {
+          "note": "returns a reference",
+          "output": [
+            "application/vnd.xeet-artifact+ref",
+            "application/json"
+          ],
+          "select": {}
+        }
+      ],
+      "outcomes": [
+        "import an artifact",
+        "add an artifact to the store",
+        "load a package"
+      ],
+      "outputSchema": {
+        "properties": {
+          "artifact": {
+            "description": "artifact://sha256/<hex>",
+            "type": "string"
+          },
+          "derivedFrom": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "subject": {
+            "type": "object"
+          },
+          "verification": {
+            "properties": {
+              "failed": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "ok": {
+                "type": "boolean"
+              },
+              "skipped": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "ok",
+              "failed"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "artifact",
+          "id",
+          "verification"
+        ],
+        "type": "object"
+      },
+      "preconditions": [
+        "path inside an allowed read root"
+      ],
+      "summary": "Verify an artifact package from a path and add it to the store.",
+      "title": "Ingest an existing artifact package",
+      "version": "0.1"
+    },
+    {
+      "authority": [
+        "store:read"
+      ],
+      "consequential": false,
+      "constraints": {
+        "deterministic": true,
+        "maxInputBytes": 16777216,
+        "network": "none",
+        "notes": []
+      },
+      "description": "The authoritative structured form, unprojected. For a compact or budgeted reading, use representation.understand.",
+      "effects": "none",
+      "errors": [
+        "invalid_input",
+        "not_found",
+        "unauthorized",
+        "limit_exceeded"
+      ],
+      "guarantees": [
+        "the document is returned exactly as stored; its id can be re-derived with representation.verify"
+      ],
+      "id": "representation.inspect",
+      "inputModalities": [
+        "application/vnd.xeet-artifact+ref"
+      ],
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "artifact": {
+            "description": "An artifact id (sha256:<hex>), its URI (artifact://sha256/<hex>), or a package directory path inside a read root the host allows (needs fs:read).",
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "artifact"
+        ],
+        "type": "object"
+      },
+      "limitations": [],
+      "modes": [
+        {
+          "note": "the document",
+          "output": [
+            "application/json"
+          ],
+          "select": {}
+        }
+      ],
+      "outcomes": [
+        "inspect an artifact",
+        "get the raw artifact document",
+        "full provenance and assets",
+        "read the artifact json"
+      ],
+      "outputSchema": {
+        "properties": {
+          "artifact": {
+            "type": "string"
+          },
+          "document": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "artifact",
+          "document"
+        ],
+        "type": "object"
+      },
+      "preconditions": [],
+      "summary": "Return the complete artifact document (subject, provenance, views, semantic graph, state, capabilities, limitations, coverage, assets) as stored.",
+      "title": "Inspect an artifact document",
+      "version": "0.1"
+    },
+    {
+      "authority": [
+        "store:read"
+      ],
+      "consequential": false,
+      "constraints": {
+        "deterministic": true,
+        "maxInputBytes": 16777216,
+        "network": "none",
+        "notes": [
+          "typical latency a few milliseconds"
+        ]
+      },
+      "description": "A deterministic projection. Text-only consumers receive everything except pixels, plus an explicit list of content that exists only as pixels. Vision consumers additionally receive the view image; anything read from it is inference. Supports a focus element, depth, sections, and character budgets for small context windows; omissions are always listed.",
+      "effects": "none",
+      "errors": [
+        "invalid_input",
+        "not_found",
+        "unauthorized",
+        "limit_exceeded"
+      ],
+      "guarantees": [
+        "deterministic: same artifact and request give the same bytes",
+        "element ids are the artifact's ids",
+        "basis marks distinguish source, derived, observed, inferred and unknown",
+        "provenance header is never dropped; every omission is listed"
+      ],
+      "id": "representation.understand",
+      "inputModalities": [
+        "application/vnd.xeet-artifact+ref"
+      ],
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "artifact": {
+            "description": "An artifact id (sha256:<hex>), its URI (artifact://sha256/<hex>), or a package directory path inside a read root the host allows (needs fs:read).",
+            "minLength": 1,
+            "type": "string"
+          },
+          "compactCapabilities": {
+            "type": "boolean"
+          },
+          "consumer": {
+            "default": "text",
+            "description": "text: no pixels, everything else; vision: also returns the image(s)",
+            "enum": [
+              "text",
+              "vision"
+            ]
+          },
+          "depth": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "focus": {
+            "description": "element id; its ancestors are kept as context",
+            "type": "string"
+          },
+          "format": {
+            "default": "text",
+            "enum": [
+              "text",
+              "json"
+            ]
+          },
+          "maxChars": {
+            "description": "total budget; filled by priority, omissions listed",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "maxText": {
+            "description": "truncate any single string, saying so",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "sections": {
+            "items": {
+              "enum": [
+                "elements",
+                "layout",
+                "relations",
+                "state",
+                "capabilities",
+                "limitations",
+                "consumers"
+              ]
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "artifact"
+        ],
+        "type": "object"
+      },
+      "limitations": [
+        "content marked visual-only is not readable as text by anyone; vision readings are inference"
+      ],
+      "modes": [
+        {
+          "note": "line-oriented text; works for any model",
+          "output": [
+            "text/plain"
+          ],
+          "select": {
+            "consumer": "text",
+            "format": "text"
+          }
+        },
+        {
+          "note": "the same projection, typed",
+          "output": [
+            "application/json"
+          ],
+          "select": {
+            "consumer": "text",
+            "format": "json"
+          }
+        },
+        {
+          "note": "image(s) plus the same text",
+          "output": [
+            "image/png",
+            "text/plain"
+          ],
+          "select": {
+            "consumer": "vision"
+          }
+        }
+      ],
+      "outcomes": [
+        "understand a screenshot without vision",
+        "read visual information as text",
+        "describe what is on screen",
+        "text representation of an image",
+        "make visual content readable by a text-only model",
+        "summarize an artifact for a small context window",
+        "get layout and positions as text",
+        "what does this artifact contain",
+        "read the state of a pull request",
+        "get the semantic content"
+      ],
+      "outputSchema": {
+        "properties": {
+          "artifact": {
+            "type": "string"
+          },
+          "delivery": {
+            "description": "what this projection delivered and left out",
+            "required": [
+              "chars",
+              "elementsIncluded",
+              "omitted",
+              "inferred",
+              "visualOnly"
+            ],
+            "type": "object"
+          },
+          "format": {
+            "enum": [
+              "text",
+              "json"
+            ]
+          },
+          "images": {
+            "items": {
+              "properties": {
+                "data": {
+                  "description": "base64",
+                  "type": "string"
+                },
+                "mediaType": {
+                  "type": "string"
+                },
+                "view": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "view",
+                "mediaType",
+                "data"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "projection": {
+            "type": [
+              "string",
+              "object"
+            ]
+          }
+        },
+        "required": [
+          "artifact",
+          "format",
+          "projection"
+        ],
+        "type": "object"
+      },
+      "preconditions": [],
+      "summary": "Get an artifact's full meaning as text or JSON — elements, positions, layout rows, state, capabilities, limitations — without needing vision; optionally with the image.",
+      "title": "Understand an artifact (projection for a consumer)",
+      "version": "0.1"
+    },
+    {
+      "authority": [
+        "store:read"
+      ],
+      "consequential": false,
+      "constraints": {
+        "deterministic": true,
+        "maxInputBytes": 16777216,
+        "network": "none",
+        "notes": []
+      },
+      "description": "For consumers that read images or for showing people. Text-only consumers should use representation.understand instead; this capability only returns pixels.",
+      "effects": "none",
+      "errors": [
+        "invalid_input",
+        "not_found",
+        "unauthorized",
+        "limit_exceeded"
+      ],
+      "guarantees": [
+        "the bytes are the stored view, whose hash the artifact names"
+      ],
+      "id": "representation.render",
+      "inputModalities": [
+        "application/vnd.xeet-artifact+ref"
+      ],
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "artifact": {
+            "description": "An artifact id (sha256:<hex>), its URI (artifact://sha256/<hex>), or a package directory path inside a read root the host allows (needs fs:read).",
+            "minLength": 1,
+            "type": "string"
+          },
+          "view": {
+            "default": "v0",
+            "type": "string"
+          }
+        },
+        "required": [
+          "artifact"
+        ],
+        "type": "object"
+      },
+      "limitations": [],
+      "modes": [
+        {
+          "note": "image only",
+          "output": [
+            "image/png"
+          ],
+          "select": {}
+        }
+      ],
+      "outcomes": [
+        "show the image",
+        "get the screenshot",
+        "render the view",
+        "visual evidence for a person"
+      ],
+      "outputSchema": {
+        "properties": {
+          "artifact": {
+            "type": "string"
+          },
+          "data": {
+            "description": "base64",
+            "type": "string"
+          },
+          "mediaType": {
+            "type": "string"
+          },
+          "view": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "artifact",
+          "view",
+          "mediaType",
+          "data"
+        ],
+        "type": "object"
+      },
+      "preconditions": [],
+      "summary": "Return one of an artifact's images (PNG) with its view metadata.",
+      "title": "Get a visual view",
+      "version": "0.1"
+    },
+    {
+      "authority": [
+        "store:read",
+        "store:write"
+      ],
+      "consequential": false,
+      "constraints": {
+        "deterministic": true,
+        "maxInputBytes": 16777216,
+        "network": "none",
+        "notes": []
+      },
+      "description": "Runs only capabilities the artifact marks local-executable. Anything that needs outside authority (reply, merge, like) is refused: the provider never acts at a source.",
+      "effects": "creates-artifact",
+      "errors": [
+        "invalid_input",
+        "not_found",
+        "unauthorized",
+        "limit_exceeded",
+        "verification_failed",
+        "unsupported"
+      ],
+      "guarantees": [
+        "the derived artifact names its parent in provenance.derivedFrom and passes verification"
+      ],
+      "id": "representation.derive",
+      "inputModalities": [
+        "application/vnd.xeet-artifact+ref"
+      ],
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "artifact": {
+            "description": "An artifact id (sha256:<hex>), its URI (artifact://sha256/<hex>), or a package directory path inside a read root the host allows (needs fs:read).",
+            "minLength": 1,
+            "type": "string"
+          },
+          "capability": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "input": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "artifact",
+          "capability"
+        ],
+        "type": "object"
+      },
+      "limitations": [
+        "only x.post artifacts have local capabilities today"
+      ],
+      "modes": [
+        {
+          "note": "returns a reference",
+          "output": [
+            "application/vnd.xeet-artifact+ref",
+            "application/json"
+          ],
+          "select": {}
+        }
+      ],
+      "outcomes": [
+        "expand show more",
+        "switch to dark theme",
+        "re-render differently",
+        "derive a new view"
+      ],
+      "outputSchema": {
+        "properties": {
+          "artifact": {
+            "description": "artifact://sha256/<hex>",
+            "type": "string"
+          },
+          "derivedFrom": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "subject": {
+            "type": "object"
+          },
+          "verification": {
+            "properties": {
+              "failed": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "ok": {
+                "type": "boolean"
+              },
+              "skipped": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "ok",
+              "failed"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "artifact",
+          "id",
+          "verification"
+        ],
+        "type": "object"
+      },
+      "preconditions": [
+        "the capability is local-executable in the artifact"
+      ],
+      "summary": "Produce a new artifact of the same observation with different view options (expand, retheme), from the preserved input.",
+      "title": "Run a local projection capability",
+      "version": "0.1"
+    },
+    {
+      "authority": [
+        "store:read"
+      ],
+      "consequential": false,
+      "constraints": {
+        "deterministic": true,
+        "maxInputBytes": 16777216,
+        "network": "none",
+        "notes": []
+      },
+      "description": "Named checks: format, schema, identity, assets, views, semantic, basis, state, capabilities, provenance, coverage, reproduction.",
+      "effects": "none",
+      "errors": [
+        "invalid_input",
+        "not_found",
+        "unauthorized",
+        "limit_exceeded"
+      ],
+      "guarantees": [
+        "deterministic; no network, clock or model"
+      ],
+      "id": "representation.verify",
+      "inputModalities": [
+        "application/vnd.xeet-artifact+ref"
+      ],
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "artifact": {
+            "description": "An artifact id (sha256:<hex>), its URI (artifact://sha256/<hex>), or a package directory path inside a read root the host allows (needs fs:read).",
+            "minLength": 1,
+            "type": "string"
+          },
+          "reproduce": {
+            "default": true,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "artifact"
+        ],
+        "type": "object"
+      },
+      "limitations": [
+        "cannot establish source authenticity or current truth"
+      ],
+      "modes": [
+        {
+          "note": "verification report",
+          "output": [
+            "application/json"
+          ],
+          "select": {}
+        }
+      ],
+      "outcomes": [
+        "check integrity",
+        "verify an artifact",
+        "is this artifact authentic or tampered",
+        "prove the image matches the data"
+      ],
+      "outputSchema": {
+        "properties": {
+          "artifact": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "cannotEstablish": {
+            "type": "array"
+          },
+          "checks": {
+            "items": {
+              "required": [
+                "name",
+                "status"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "ok": {
+            "type": "boolean"
+          },
+          "requiresExternalAuthority": {
+            "type": "array"
+          }
+        },
+        "required": [
+          "ok",
+          "checks",
+          "cannotEstablish"
+        ],
+        "type": "object"
+      },
+      "preconditions": [],
+      "summary": "Check integrity, consistency, honesty rules and (optionally) byte-for-byte reproduction; also lists what cannot be established.",
+      "title": "Verify an artifact",
+      "version": "0.1"
+    },
+    {
+      "authority": [
+        "store:read"
+      ],
+      "consequential": false,
+      "constraints": {
+        "deterministic": true,
+        "maxInputBytes": 16777216,
+        "network": "none",
+        "notes": []
+      },
+      "description": "Identical pixels do not imply identical meaning and vice versa; both are reported.",
+      "effects": "none",
+      "errors": [
+        "invalid_input",
+        "not_found",
+        "unauthorized",
+        "limit_exceeded"
+      ],
+      "guarantees": [
+        "deterministic"
+      ],
+      "id": "representation.compare",
+      "inputModalities": [
+        "application/vnd.xeet-artifact+ref"
+      ],
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "a": {
+            "description": "An artifact id (sha256:<hex>), its URI (artifact://sha256/<hex>), or a package directory path inside a read root the host allows (needs fs:read).",
+            "minLength": 1,
+            "type": "string"
+          },
+          "b": {
+            "description": "An artifact id (sha256:<hex>), its URI (artifact://sha256/<hex>), or a package directory path inside a read root the host allows (needs fs:read).",
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "a",
+          "b"
+        ],
+        "type": "object"
+      },
+      "limitations": [
+        "element matching relies on adapter-stable ids"
+      ],
+      "modes": [
+        {
+          "note": "comparison",
+          "output": [
+            "application/json"
+          ],
+          "select": {}
+        }
+      ],
+      "outcomes": [
+        "what changed",
+        "diff two snapshots",
+        "compare observations over time"
+      ],
+      "outputSchema": {
+        "properties": {
+          "factsChanged": {
+            "type": "array"
+          },
+          "identical": {
+            "type": "boolean"
+          },
+          "views": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "identical",
+          "views",
+          "factsChanged"
+        ],
+        "type": "object"
+      },
+      "preconditions": [],
+      "summary": "What differs between two artifacts: views, elements, state facts, capabilities.",
+      "title": "Compare two observations",
+      "version": "0.1"
+    },
+    {
+      "authority": [
+        "store:read"
+      ],
+      "consequential": false,
+      "constraints": {
+        "deterministic": true,
+        "maxInputBytes": 16777216,
+        "network": "none",
+        "notes": []
+      },
+      "description": "Returns references and summaries, newest capture first. Read the content with representation.understand.",
+      "effects": "none",
+      "errors": [
+        "invalid_input",
+        "not_found",
+        "unauthorized",
+        "limit_exceeded"
+      ],
+      "guarantees": [
+        "deterministic order: capturedAt descending, then id"
+      ],
+      "id": "representation.retrieve",
+      "inputModalities": [
+        "application/json"
+      ],
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "inputDigest": {
+            "description": "sha256:<hex> of a source input: finds artifacts already made from the same bytes, so they are reused rather than recreated",
+            "type": "string"
+          },
+          "limit": {
+            "default": 50,
+            "maximum": 500,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "reference": {
+            "type": "string"
+          },
+          "subjectType": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "limitations": [
+        "substring filters, not semantic search"
+      ],
+      "modes": [
+        {
+          "note": "list of references",
+          "output": [
+            "application/json"
+          ],
+          "select": {}
+        }
+      ],
+      "outcomes": [
+        "find artifacts",
+        "list observations",
+        "history of a subject",
+        "search stored artifacts"
+      ],
+      "outputSchema": {
+        "properties": {
+          "artifacts": {
+            "items": {
+              "required": [
+                "id",
+                "uri",
+                "subjectType",
+                "title",
+                "capturedAt"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "total": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "artifacts",
+          "total"
+        ],
+        "type": "object"
+      },
+      "preconditions": [],
+      "summary": "List stored artifacts, filtered by source type, subject reference, title text, or the digest of a source input (for reuse).",
+      "title": "Find artifacts in the store",
+      "version": "0.1"
+    },
+    {
+      "authority": [
+        "store:read",
+        "store:write"
+      ],
+      "consequential": false,
+      "constraints": {
+        "deterministic": false,
+        "maxInputBytes": 16777216,
+        "network": "none",
+        "notes": [
+          "the reading it records is non-deterministic by nature; recording it is deterministic"
+        ]
+      },
+      "description": "Accepts only elements and facts with basis `inferred`, requires who read them, how and when, never edits or overrides observed content, and leaves the original artifact untouched.",
+      "effects": "creates-artifact",
+      "errors": [
+        "invalid_input",
+        "not_found",
+        "unauthorized",
+        "limit_exceeded",
+        "verification_failed",
+        "unsupported"
+      ],
+      "guarantees": [
+        "inference is never recorded as source; the original is unchanged; views and inputs are carried over byte for byte"
+      ],
+      "id": "representation.annotate",
+      "inputModalities": [
+        "application/vnd.xeet-artifact+ref",
+        "application/json"
+      ],
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "annotation": {
+            "properties": {
+              "at": {
+                "type": "string"
+              },
+              "by": {
+                "required": [
+                  "name",
+                  "version"
+                ],
+                "type": "object"
+              },
+              "elements": {
+                "type": "array"
+              },
+              "facts": {
+                "type": "array"
+              },
+              "method": {
+                "type": "string"
+              },
+              "parent": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "parent",
+              "by",
+              "method",
+              "at"
+            ],
+            "type": "object"
+          },
+          "artifact": {
+            "description": "An artifact id (sha256:<hex>), its URI (artifact://sha256/<hex>), or a package directory path inside a read root the host allows (needs fs:read).",
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "artifact",
+          "annotation"
+        ],
+        "type": "object"
+      },
+      "limitations": [
+        "the provider does not perform the reading itself"
+      ],
+      "modes": [
+        {
+          "note": "returns a reference",
+          "output": [
+            "application/vnd.xeet-artifact+ref",
+            "application/json"
+          ],
+          "select": {}
+        }
+      ],
+      "outcomes": [
+        "record what a vision model saw",
+        "add OCR results",
+        "describe an image for text-only models",
+        "store extracted chart values"
+      ],
+      "outputSchema": {
+        "properties": {
+          "artifact": {
+            "description": "artifact://sha256/<hex>",
+            "type": "string"
+          },
+          "derivedFrom": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "subject": {
+            "type": "object"
+          },
+          "verification": {
+            "properties": {
+              "failed": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "ok": {
+                "type": "boolean"
+              },
+              "skipped": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "ok",
+              "failed"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "artifact",
+          "id",
+          "verification"
+        ],
+        "type": "object"
+      },
+      "preconditions": [
+        "every added element and fact has basis inferred"
+      ],
+      "summary": "Record what an external vision model or OCR read from an artifact's image, as declared inference in a new derived artifact.",
+      "title": "Add content read from pixels, as inference",
+      "version": "0.1"
+    }
+  ],
+  "compatibility": {
+    "artifactFormat": "xeet-artifact",
+    "artifactVersionWritten": "0.1",
+    "artifactVersionsRead": "0.x",
+    "contractVersion": "0.1",
+    "notes": [
+      "contract ids name capabilities, not this provider; minor versions only add optional fields",
+      "unknown input fields are rejected, unknown output fields must be ignored"
+    ],
+    "projectionFormat": "xeet-artifact.projection 0.1"
+  },
+  "constraints": {
+    "deterministic": true,
+    "maxInputBytes": 16777216,
+    "network": "none",
+    "notes": [
+      "single process, local filesystem store",
+      "no clock except the host-supplied capture time"
+    ]
+  },
+  "format": "representation-engine.manifest",
+  "interfaces": [
+    {
+      "description": "`xeet engine mcp`: progressive tools (engine_discover, engine_describe, engine_invoke) by default, every capability as a tool with --tools all; artifacts as resources",
+      "kind": "mcp-stdio"
+    },
+    {
+      "description": "`xeet engine manifest | discover | describe | call <capability> --input JSON`",
+      "kind": "cli"
+    },
+    {
+      "description": "xeet_engine::Engine::invoke(capability, input, session)",
+      "kind": "rust"
+    }
+  ],
+  "limitations": [
+    "four source types; images and screenshots are identified and measured by the engine, not interpreted",
+    "the engine itself does no OCR or image interpretation (local OCR is the separate xeet-ocr provider, behind the ocr:local scope)",
+    "no network",
+    "artifact authenticity is always unverified",
+    "discovery matches declared outcomes by keywords, not by meaning"
+  ],
+  "nonCapabilities": [
+    {
+      "alternative": "use an external vision or OCR provider, then record its reading with representation.annotate, where it stays marked as inference",
+      "outcomes": [
+        "ocr an arbitrary image",
+        "read text from a photo",
+        "understand an arbitrary screenshot or image file",
+        "describe a picture",
+        "extract chart values from pixels"
+      ],
+      "why": "the provider builds representations from source data; it does not interpret pixels it did not render, and would only be guessing"
+    },
+    {
+      "alternative": "read the action's contract with representation.understand (capabilities section) and execute it with the origin system under your own authority",
+      "outcomes": [
+        "merge a pull request",
+        "approve a review",
+        "post a reply",
+        "like a post",
+        "execute an action at the source",
+        "comment on a pull request"
+      ],
+      "why": "the provider never acts at a source system; artifacts describe such actions with the authority they require"
+    },
+    {
+      "alternative": "fetch with your own client (or `xeet resolve` for X), then representation.capture",
+      "outcomes": [
+        "fetch a url",
+        "download a post",
+        "call the github api",
+        "scrape a page"
+      ],
+      "why": "the provider has no network access by design; the caller supplies source data"
+    }
+  ],
+  "provider": {
+    "description": "Captures observations as durable artifacts that people can see and agents can read without vision, verifies them offline, and describes what can be done with them without granting it.",
+    "id": "xeet",
+    "name": "xeet representation engine",
+    "version": "0.1.0"
+  },
+  "sources": [
+    {
+      "adapter": "xeet-capture/x",
+      "adapterVersion": "0.1.0",
+      "coverage": {
+        "bounds": "partial",
+        "capabilities": "partial",
+        "provenance": "supported",
+        "reproduction": "supported",
+        "semantic": "partial",
+        "state": "partial",
+        "visual": "supported"
+      },
+      "input": "a model::Post JSON (see crates/xeet-core/src/model.rs) or `xeet resolve` output",
+      "notes": [
+        "entity-level bounds are not computed",
+        "media without bytes render as placeholders and are declared approximated"
+      ],
+      "type": "x.post",
+      "visualFidelity": "oracle-verified against Chrome for the ruleset's verified surfaces"
+    },
+    {
+      "adapter": "xeet-capture/image",
+      "adapterVersion": "0.1.0",
+      "coverage": {
+        "bounds": "partial",
+        "capabilities": "not-applicable",
+        "provenance": "partial",
+        "reproduction": "supported",
+        "semantic": "not-supported",
+        "state": "partial",
+        "visual": "supported"
+      },
+      "input": "PNG, JPEG, GIF or WebP bytes, identified by content (magic bytes), not by name or declared type",
+      "notes": [
+        "format, dimensions and digest only; the content is visual-only until a reader annotates it as inference"
+      ],
+      "type": "image",
+      "visualFidelity": "original: the view is the source bytes"
+    },
+    {
+      "adapter": "xeet-capture/image",
+      "adapterVersion": "0.1.0",
+      "coverage": {
+        "bounds": "partial",
+        "capabilities": "not-applicable",
+        "provenance": "supported",
+        "reproduction": "supported",
+        "semantic": "partial",
+        "state": "partial",
+        "visual": "supported"
+      },
+      "input": "image bytes plus the capturing application's context (xeet_capture::image::CaptureContext): method, mode, platform, display, captured frame, window and app identity, permissions, optional accessibility tree",
+      "notes": [
+        "context is observed by the capturing app; the accessibility tree is a separate source (what the app reports); missing permissions are recorded as omissions",
+        "text in the pixels is added only by a vision.read provider, as inference"
+      ],
+      "type": "screenshot",
+      "visualFidelity": "original: the view is the captured bytes"
+    },
+    {
+      "adapter": "xeet-capture/github",
+      "adapterVersion": "0.1.0",
+      "coverage": {
+        "bounds": "partial",
+        "capabilities": "supported",
+        "provenance": "supported",
+        "reproduction": "supported",
+        "semantic": "supported",
+        "state": "partial",
+        "visual": "partial"
+      },
+      "input": "{pull, reviews?, comments?, files?, commits?, apiVersion?}: GitHub REST API responses",
+      "notes": [
+        "markdown shown as text",
+        "inline review threads, checks and statuses not read"
+      ],
+      "type": "github.pull_request",
+      "visualFidelity": "generic document layout; not a replica of github.com"
+    }
+  ],
+  "version": "0.1"
+}

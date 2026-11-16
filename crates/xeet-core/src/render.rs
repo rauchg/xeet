@@ -605,6 +605,20 @@ pub fn frame_lines(post: &Post, opts: &RenderOptions) -> Vec<FrameLine> {
         .collect()
 }
 
+/// The frame's named boxes (`name`, `handle`, `text`, `attachment`, `likePill`,
+/// …) in CSS pixels, exactly as `layout` placed them for this render. These are
+/// the boxes `examples/frame_parity.rs` gates against Chrome, so a consumer
+/// that maps meaning onto pixels uses measured geometry, not a re-derivation.
+///
+/// Runs the same decisions and layout as [`render`]; it never rasterizes and
+/// does not change the display list (see `frame::geometry_is_optional`).
+/// Callers should validate input through [`explain`] or [`render`] first.
+pub fn frame_boxes(post: &Post, opts: &RenderOptions) -> std::collections::BTreeMap<String, Rect> {
+    let decisions = rules::decide(post, opts);
+    let (_, _, geometry) = frame::layout_debug(post, opts, &decisions);
+    geometry.boxes
+}
+
 /// One line box of one text block, for the geometry oracle.
 #[derive(Clone, Debug, serde::Serialize)]
 pub struct FrameLine {

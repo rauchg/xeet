@@ -1,0 +1,7 @@
+
+
+Based on the text projection of the image, the invoices that are overdue are:
+
+* INV-1041 (Due 2026-10-01)
+* INV-1043 (Due 2026-09-15)
+* INV-1045 (Due 2026-10-20)

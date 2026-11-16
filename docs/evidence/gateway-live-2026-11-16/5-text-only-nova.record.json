@@ -1,0 +1,235 @@
+{
+  "at": "2026-11-16T16:09:46Z",
+  "attempts": [
+    {
+      "n": 0,
+      "observed": [],
+      "outcome": "accepted",
+      "prepared": {
+        "budget": {
+          "availableChars": 478469,
+          "charsPerToken": 4.0,
+          "contextTokens": 128000,
+          "fixedChars": 763,
+          "perRepresentationChars": 478469,
+          "represented": 1,
+          "reservedOutputTokens": 8192,
+          "source": "profile"
+        },
+        "parts": [
+          {
+            "acceptance": {
+              "decision": "reject",
+              "reason": "image/* is unsupported",
+              "rule": "image/*",
+              "source": "provider-reported"
+            },
+            "artifact": "artifact://sha256/ba7d29ba7be19467093257325ab2609730b9245bce80028e52915ddf3cb25272",
+            "budgetChars": 478469,
+            "contentRead": true,
+            "decision": "represent",
+            "delivery": {
+              "chars": 8758,
+              "compactCapabilities": false,
+              "elementsIncluded": 16,
+              "inferred": [
+                "reading",
+                "reading.0",
+                "reading.1",
+                "reading.2",
+                "reading.3",
+                "reading.4",
+                "reading.5",
+                "reading.6",
+                "reading.7",
+                "reading.8",
+                "reading.9",
+                "reading.10",
+                "reading.11",
+                "reading.12",
+                "reading.13"
+              ],
+              "omitted": {
+                "elements": [],
+                "reasons": [],
+                "sections": []
+              },
+              "visualOnly": [
+                "image"
+              ]
+            },
+            "inspection": {
+              "bytes": 80956,
+              "class": "image",
+              "declaredMismatch": false,
+              "declaredName": "invoices.png",
+              "digest": "sha256:15b81b83902b4c53bd08f121145633089af221c168fecfeaf267dcbe8cf86b9f",
+              "dimensions": [
+                480,
+                356
+              ],
+              "index": 0,
+              "mediaType": "image/png",
+              "origin": "path"
+            },
+            "reason": "model does not accept it: image/* is unsupported (ProviderReported)",
+            "reused": true,
+            "steps": [
+              {
+                "candidates": [
+                  {
+                    "capability": "representation.retrieve",
+                    "provider": "xeet",
+                    "score": 1,
+                    "version": "0.1"
+                  }
+                ],
+                "inputDigest": "sha256:3dbc74d82c0560c068f83cc599ed2bf5c676d8f59465fc21cfe2da30615e29cb",
+                "ok": true,
+                "purpose": "reuse",
+                "query": {
+                  "accepts": [],
+                  "has": [
+                    "application/json"
+                  ],
+                  "limit": null,
+                  "outcome": null,
+                  "source": null
+                },
+                "resultDigest": "sha256:803fbc913cf764de8862295be5719d1f6d18661768ad793cd05a591af1a862c4",
+                "selected": {
+                  "capability": "representation.retrieve",
+                  "provider": "xeet",
+                  "score": 1,
+                  "version": "0.1"
+                },
+                "skipped": []
+              },
+              {
+                "candidates": [],
+                "inputDigest": "sha256:96b9358f3681df6d7f30d68031607af0a3aea767c339b8403e5f8a50274be7aa",
+                "ok": true,
+                "purpose": "validate",
+                "query": {
+                  "artifact": "sha256:ba7d29ba7be19467093257325ab2609730b9245bce80028e52915ddf3cb25272"
+                },
+                "resultDigest": "sha256:753856319a1b23d4244cd2c801db767dec983f34e8857e9fe38227a6b4ca1584",
+                "selected": {
+                  "capability": "representation.inspect",
+                  "provider": "xeet",
+                  "score": 0,
+                  "version": "0.1"
+                },
+                "skipped": []
+              },
+              {
+                "candidates": [
+                  {
+                    "capability": "representation.understand",
+                    "provider": "xeet",
+                    "score": 1,
+                    "version": "0.1"
+                  }
+                ],
+                "inputDigest": "sha256:c59e7fcf27c626930d9032e82d9b94d2bc989200a1e83e33aba8ea44a47d74c3",
+                "ok": true,
+                "purpose": "project",
+                "query": {
+                  "accepts": [
+                    "text/plain"
+                  ],
+                  "has": [
+                    "application/vnd.xeet-artifact+ref"
+                  ],
+                  "limit": null,
+                  "outcome": null,
+                  "source": null
+                },
+                "resultDigest": "sha256:186adae110bb869c173d5c53ccf7687978c150de1eb954fbeb71535b09149b91",
+                "selected": {
+                  "capability": "representation.understand",
+                  "provider": "xeet",
+                  "score": 1,
+                  "version": "0.1"
+                },
+                "skipped": []
+              }
+            ]
+          }
+        ],
+        "requestDigest": "sha256:395f22424514161b9831b8dc463fe5540895c6871cd53a09fb61567dc2e4bdbd",
+        "requestSummary": [
+          {
+            "chars": 63,
+            "sha256": "sha256:33c349089c2cc22f3cd88eae8c18cbbd5cf86cefc0a680ed31f63be94d3cf384",
+            "type": "text"
+          },
+          {
+            "chars": 9452,
+            "sha256": "sha256:422a9a72e4386a9cf6b90f31964631d37336692cb5fc53fe97469b92324e4326",
+            "type": "text"
+          }
+        ]
+      }
+    }
+  ],
+  "fallback": {
+    "triggered": false
+  },
+  "format": "modality-gateway.record",
+  "id": "sha256:e7ce65e67795a1223b6740c6b21272d4b8b41b0bbedd5dc770afaf28841ecc43",
+  "instructionChars": 63,
+  "instructionDigest": "sha256:33c349089c2cc22f3cd88eae8c18cbbd5cf86cefc0a680ed31f63be94d3cf384",
+  "model": {
+    "declared": [
+      {
+        "evidence": "ai-gateway /v1/models: \"text\" listed in modalities.input [\"text\"]",
+        "mediaType": "text/plain",
+        "source": "provider-reported",
+        "support": "supported"
+      },
+      {
+        "evidence": "ai-gateway /v1/models: \"image\" not listed in modalities.input [\"text\"]",
+        "mediaType": "image/*",
+        "source": "provider-reported",
+        "support": "unsupported"
+      },
+      {
+        "evidence": "ai-gateway /v1/models: \"pdf\" not listed in modalities.input [\"text\"]",
+        "mediaType": "application/pdf",
+        "source": "provider-reported",
+        "support": "unsupported"
+      },
+      {
+        "evidence": "ai-gateway /v1/models: \"audio\" not listed in modalities.input [\"text\"]",
+        "mediaType": "audio/*",
+        "source": "provider-reported",
+        "support": "unsupported"
+      },
+      {
+        "evidence": "ai-gateway /v1/models: \"video\" not listed in modalities.input [\"text\"]",
+        "mediaType": "video/*",
+        "source": "provider-reported",
+        "support": "unsupported"
+      }
+    ],
+    "model": "amazon/nova-micro",
+    "observed": [],
+    "profileDigest": "sha256:b48da2412052f935311212bb098c3d5f8a2b51b2a7b37f68cb9a42ed98e74467",
+    "profileSource": "provider-reported",
+    "provider": "ai-gateway",
+    "revision": "released:1733184000"
+  },
+  "providers": [
+    {
+      "id": "xeet",
+      "version": "0.1.0"
+    },
+    {
+      "id": "model-reader:openai/gpt-4o-mini",
+      "version": "0.1.0"
+    }
+  ],
+  "result": "accepted",
+  "version": "0.1"
+}

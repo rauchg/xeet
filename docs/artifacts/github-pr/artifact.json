@@ -1,0 +1,1068 @@
+{
+  "assets": [
+    {
+      "bytes": 221006,
+      "mediaType": "image/png",
+      "path": "assets/802c409de76f8c02ea9f725832c55ff441a8397a6ff2e300a211019d60ed238f.png",
+      "sha256": "sha256:802c409de76f8c02ea9f725832c55ff441a8397a6ff2e300a211019d60ed238f"
+    },
+    {
+      "bytes": 3273,
+      "mediaType": "application/json",
+      "path": "assets/a62fb7c5674c1f4309dcd7099caca3277c4f4f32ad85ac3bfcd5d497d8b2d64f.json",
+      "sha256": "sha256:a62fb7c5674c1f4309dcd7099caca3277c4f4f32ad85ac3bfcd5d497d8b2d64f"
+    }
+  ],
+  "capabilities": [
+    {
+      "authority": {
+        "checkedBy": "none",
+        "required": []
+      },
+      "availability": "delegated",
+      "effects": [
+        "none at the source"
+      ],
+      "executor": {
+        "kind": "user-agent",
+        "reference": "https://github.com/example-org/xeet/pull/7"
+      },
+      "id": "open-pr",
+      "inputSchema": {
+        "properties": {},
+        "type": "object"
+      },
+      "kind": "navigate",
+      "preconditions": [
+        "the URL still resolves and the viewer can read the repository"
+      ],
+      "target": "pr",
+      "title": "Open the pull request on GitHub",
+      "verification": "the user agent reaches the URL"
+    },
+    {
+      "authority": {
+        "checkedBy": "none",
+        "required": []
+      },
+      "availability": "delegated",
+      "effects": [
+        "none at the source"
+      ],
+      "executor": {
+        "kind": "user-agent",
+        "reference": "https://github.com/example-org/xeet/commit/8ddaea31d4ab16c3b14296da851b1fedda843412"
+      },
+      "id": "open-commit.8ddaea3",
+      "inputSchema": {
+        "properties": {},
+        "type": "object"
+      },
+      "kind": "navigate",
+      "preconditions": [
+        "the URL still resolves and the viewer can read the repository"
+      ],
+      "target": "commit:8ddaea3",
+      "title": "Open the commit",
+      "verification": "the user agent reaches the URL"
+    },
+    {
+      "authority": {
+        "checkedBy": "none",
+        "required": []
+      },
+      "availability": "delegated",
+      "effects": [
+        "none at the source"
+      ],
+      "executor": {
+        "kind": "user-agent",
+        "reference": "https://github.com/example-org/xeet/commit/71079ff11ab2847c1c2e5973b3901b2c7203c89d"
+      },
+      "id": "open-commit.71079ff",
+      "inputSchema": {
+        "properties": {},
+        "type": "object"
+      },
+      "kind": "navigate",
+      "preconditions": [
+        "the URL still resolves and the viewer can read the repository"
+      ],
+      "target": "commit:71079ff",
+      "title": "Open the commit",
+      "verification": "the user agent reaches the URL"
+    },
+    {
+      "authority": {
+        "checkedBy": "api.github.com",
+        "required": [
+          "GitHub token with repository contents: write on the repository"
+        ]
+      },
+      "availability": "delegated",
+      "effects": [
+        "head is merged into base; pull request becomes merged"
+      ],
+      "executor": {
+        "kind": "origin",
+        "reference": "PUT api.github.com /repos/example-org/xeet/pulls/7/merge"
+      },
+      "id": "merge",
+      "inputSchema": {
+        "properties": {
+          "commit_message": {
+            "type": "string"
+          },
+          "commit_title": {
+            "type": "string"
+          },
+          "merge_method": {
+            "enum": [
+              "merge",
+              "squash",
+              "rebase"
+            ]
+          },
+          "sha": {
+            "const": "71079ff11ab2847c1c2e5973b3901b2c7203c89d",
+            "description": "the head commit observed at capture; GitHub refuses the merge if the head has moved"
+          }
+        },
+        "required": [
+          "sha"
+        ],
+        "type": "object"
+      },
+      "kind": "mutation",
+      "preconditions": [
+        "state is open and not draft (true at capture: see state)",
+        "mergeable (see state.mergeable; may be unknown)",
+        "head still at the captured headSha"
+      ],
+      "target": "pr",
+      "title": "Merge the pull request",
+      "verification": "GET api.github.com /repos/example-org/xeet/pulls/7 reports merged: true"
+    },
+    {
+      "authority": {
+        "checkedBy": "api.github.com",
+        "required": [
+          "GitHub token with pull requests: write on the repository"
+        ]
+      },
+      "availability": "delegated",
+      "effects": [
+        "a review by the acting account"
+      ],
+      "executor": {
+        "kind": "origin",
+        "reference": "POST api.github.com /repos/example-org/xeet/pulls/7/reviews"
+      },
+      "id": "review",
+      "inputSchema": {
+        "properties": {
+          "body": {
+            "type": "string"
+          },
+          "commit_id": {
+            "const": "71079ff11ab2847c1c2e5973b3901b2c7203c89d"
+          },
+          "event": {
+            "enum": [
+              "APPROVE",
+              "REQUEST_CHANGES",
+              "COMMENT"
+            ]
+          }
+        },
+        "required": [
+          "event"
+        ],
+        "type": "object"
+      },
+      "kind": "communication",
+      "preconditions": [
+        "state is open"
+      ],
+      "target": "pr",
+      "title": "Submit a review",
+      "verification": "GET api.github.com /repos/example-org/xeet/pulls/7/reviews lists the new review"
+    },
+    {
+      "authority": {
+        "checkedBy": "api.github.com",
+        "required": [
+          "GitHub token with pull requests: write on the repository"
+        ]
+      },
+      "availability": "delegated",
+      "effects": [
+        "pull request state becomes closed"
+      ],
+      "executor": {
+        "kind": "origin",
+        "reference": "PATCH api.github.com /repos/example-org/xeet/pulls/7"
+      },
+      "id": "close",
+      "inputSchema": {
+        "properties": {
+          "state": {
+            "const": "closed"
+          }
+        },
+        "required": [
+          "state"
+        ],
+        "type": "object"
+      },
+      "kind": "mutation",
+      "preconditions": [
+        "state is open"
+      ],
+      "target": "pr",
+      "title": "Close without merging",
+      "verification": "GET api.github.com /repos/example-org/xeet/pulls/7 reports state: closed"
+    },
+    {
+      "authority": {
+        "checkedBy": "api.github.com",
+        "required": [
+          "GitHub token with issues: write (or pull requests: write) on the repository"
+        ]
+      },
+      "availability": "delegated",
+      "effects": [
+        "a comment by the acting account"
+      ],
+      "executor": {
+        "kind": "origin",
+        "reference": "POST api.github.com /repos/example-org/xeet/issues/7/comments"
+      },
+      "id": "comment",
+      "inputSchema": {
+        "properties": {
+          "body": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "body"
+        ],
+        "type": "object"
+      },
+      "kind": "communication",
+      "preconditions": [
+        "the conversation is not locked (not captured)"
+      ],
+      "target": "pr",
+      "title": "Comment on the conversation",
+      "verification": "GET api.github.com /repos/example-org/xeet/issues/7/comments lists the new comment"
+    }
+  ],
+  "capabilityPolicy": "descriptive-only",
+  "coverage": {
+    "bounds": "partial",
+    "capabilities": "supported",
+    "provenance": "supported",
+    "reproduction": "supported",
+    "semantic": "supported",
+    "state": "partial",
+    "visual": "partial"
+  },
+  "format": "xeet-artifact",
+  "formatVersion": "0.1",
+  "id": "sha256:56ae99276e49a5f29b0176d9d063c010733551f612fbdc67ef5f6de2e76ab3f2",
+  "limitations": {
+    "approximated": [
+      {
+        "subject": "pr.body",
+        "what": "markdown shown as source text, not rendered",
+        "why": "the view renderer lays out text; it does not implement markdown"
+      },
+      {
+        "subject": "v0",
+        "what": "typeface and styling",
+        "why": "a generic document layout in xeet's embedded fonts; github.com's UI is not replicated"
+      }
+    ],
+    "derived": [
+      {
+        "subject": "pr",
+        "what": "reviewDecision",
+        "why": "latest approving/requesting review per reviewer in the bundle; ignores branch protection and CODEOWNERS, so it can differ from GitHub's own decision"
+      }
+    ],
+    "inferred": [],
+    "omitted": [
+      {
+        "subject": "pr.summary",
+        "what": "bounds of the author and branch names inside the summary line",
+        "why": "the view records block boxes, not token boxes"
+      },
+      {
+        "subject": "files",
+        "what": "diff contents",
+        "why": "the bundle's file entries are summarized; patches are kept only in the preserved input"
+      },
+      {
+        "subject": "pr",
+        "what": "inline review threads, check runs and commit statuses",
+        "why": "not part of the bundle this adapter version reads"
+      }
+    ],
+    "unverified": [
+      {
+        "subject": "pr",
+        "what": "mergeability",
+        "why": "GitHub had not computed it (null) in the captured response"
+      },
+      {
+        "what": "source authenticity",
+        "why": "the bundle is accepted as given; the adapter does not verify it came from GitHub"
+      }
+    ]
+  },
+  "provenance": {
+    "adapter": {
+      "name": "xeet-capture/github",
+      "version": "0.1.0"
+    },
+    "authenticity": "unverified",
+    "capture": {
+      "capturedAt": "2026-11-16T12:00:00Z",
+      "capturedBy": {
+        "name": "xeet-capture/github",
+        "version": "0.1.0"
+      },
+      "method": "fixture"
+    },
+    "inputs": [
+      {
+        "asset": "sha256:a62fb7c5674c1f4309dcd7099caca3277c4f4f32ad85ac3bfcd5d497d8b2d64f",
+        "role": "source-bundle"
+      }
+    ],
+    "source": {
+      "id": "900000001",
+      "reference": "https://github.com/example-org/xeet/pull/7",
+      "timestamps": {
+        "created_at": "2026-11-16T05:10:00Z",
+        "updated_at": "2026-11-16T07:02:11Z"
+      },
+      "type": "github",
+      "version": "rest-api@2022-11-28"
+    },
+    "transformations": [
+      {
+        "deterministic": true,
+        "inputs": [
+          "sha256:a62fb7c5674c1f4309dcd7099caca3277c4f4f32ad85ac3bfcd5d497d8b2d64f"
+        ],
+        "outputs": [
+          "semantic",
+          "state",
+          "capabilities",
+          "view-blocks"
+        ],
+        "step": "map-semantics",
+        "tool": {
+          "name": "xeet-capture/github",
+          "version": "0.1.0"
+        }
+      },
+      {
+        "deterministic": true,
+        "inputs": [
+          "view-blocks",
+          "views.v0.config"
+        ],
+        "outputs": [
+          "sha256:802c409de76f8c02ea9f725832c55ff441a8397a6ff2e300a211019d60ed238f",
+          "bounds"
+        ],
+        "step": "layout-and-rasterize",
+        "tool": {
+          "name": "xeet-capture/view",
+          "ruleset": "layout@1",
+          "version": "0.1.0"
+        }
+      }
+    ]
+  },
+  "semantic": {
+    "elements": [
+      {
+        "attrs": {
+          "github.repository": "example-org/xeet"
+        },
+        "basis": "source",
+        "children": [
+          "pr.ref",
+          "pr.title",
+          "pr.state",
+          "label:ci",
+          "label:upstream",
+          "pr.summary",
+          "stat.additions",
+          "stat.deletions",
+          "stat.files",
+          "stat.commits",
+          "pr.body",
+          "reviews",
+          "files",
+          "commits",
+          "comments"
+        ],
+        "id": "pr",
+        "kind": "record",
+        "role": "github.pull_request",
+        "text": "Fall back to the live x-web bundle when profile SSR returns 403",
+        "value": 7,
+        "visible": true
+      },
+      {
+        "basis": "source",
+        "bounds": [
+          {
+            "h": 16.0,
+            "view": "v0",
+            "w": 123.796875,
+            "x": 16.0,
+            "y": 16.0
+          }
+        ],
+        "id": "pr.ref",
+        "kind": "reference",
+        "role": "github.pr.number",
+        "text": "example-org/xeet#7",
+        "value": "https://github.com/example-org/xeet/pull/7",
+        "visible": true
+      },
+      {
+        "basis": "source",
+        "bounds": [
+          {
+            "h": 48.0,
+            "view": "v0",
+            "w": 562.40625,
+            "x": 16.0,
+            "y": 44.0
+          }
+        ],
+        "id": "pr.title",
+        "kind": "heading",
+        "role": "github.pr.title",
+        "text": "Fall back to the live x-web bundle when profile SSR returns 403",
+        "visible": true
+      },
+      {
+        "basis": "derived",
+        "bounds": [
+          {
+            "h": 24.0,
+            "view": "v0",
+            "w": 51.375,
+            "x": 16.0,
+            "y": 104.0
+          }
+        ],
+        "id": "pr.state",
+        "kind": "status",
+        "role": "github.pr.state",
+        "text": "Open",
+        "value": "open",
+        "visible": true
+      },
+      {
+        "basis": "derived",
+        "bounds": [
+          {
+            "h": 16.0,
+            "view": "v0",
+            "w": 444.765625,
+            "x": 16.0,
+            "y": 140.0
+          }
+        ],
+        "children": [
+          "pr.author",
+          "pr.base",
+          "pr.head"
+        ],
+        "id": "pr.summary",
+        "kind": "text",
+        "role": "github.pr.summary",
+        "text": "rauchg wants to merge 2 commits into main from example-org:canary-403",
+        "visible": true
+      },
+      {
+        "attrs": {
+          "github.profile": "https://github.com/rauchg"
+        },
+        "basis": "source",
+        "id": "pr.author",
+        "kind": "identity",
+        "role": "github.user",
+        "text": "rauchg",
+        "value": "rauchg",
+        "visible": true
+      },
+      {
+        "basis": "source",
+        "id": "pr.base",
+        "kind": "reference",
+        "role": "github.ref.base",
+        "text": "main",
+        "visible": true
+      },
+      {
+        "basis": "source",
+        "id": "pr.head",
+        "kind": "reference",
+        "role": "github.ref.head",
+        "text": "example-org:canary-403",
+        "value": "71079ff11ab2847c1c2e5973b3901b2c7203c89d",
+        "visible": true
+      },
+      {
+        "attrs": {
+          "github.format": "markdown"
+        },
+        "basis": "source",
+        "bounds": [
+          {
+            "h": 160.0,
+            "view": "v0",
+            "w": 568.0,
+            "x": 16.0,
+            "y": 196.0
+          }
+        ],
+        "id": "pr.body",
+        "kind": "text",
+        "role": "github.pr.body",
+        "text": "CI runners get a 403 from the profile SSR endpoint, so the upstream canary failed for reasons unrelated to X's rules.\n\nThis falls back to the live x-web bundle and records which path was used in the stamp.\n\n- [x] canary passes on CI\n- [ ] document the fallback in docs/CI.md",
+        "visible": true
+      },
+      {
+        "basis": "source",
+        "bounds": [
+          {
+            "h": 24.0,
+            "view": "v0",
+            "w": 30.03125,
+            "x": 73.375,
+            "y": 104.0
+          }
+        ],
+        "id": "label:ci",
+        "kind": "label",
+        "role": "github.label",
+        "text": "ci",
+        "visible": true
+      },
+      {
+        "basis": "source",
+        "bounds": [
+          {
+            "h": 24.0,
+            "view": "v0",
+            "w": 75.59375,
+            "x": 109.40625,
+            "y": 104.0
+          }
+        ],
+        "id": "label:upstream",
+        "kind": "label",
+        "role": "github.label",
+        "text": "upstream",
+        "visible": true
+      },
+      {
+        "basis": "source",
+        "bounds": [
+          {
+            "h": 16.0,
+            "view": "v0",
+            "w": 24.984375,
+            "x": 16.0,
+            "y": 168.0
+          }
+        ],
+        "id": "stat.additions",
+        "kind": "quantity",
+        "role": "github.pr.additions",
+        "text": "+64",
+        "unit": "lines added",
+        "value": 64,
+        "visible": true
+      },
+      {
+        "basis": "source",
+        "bounds": [
+          {
+            "h": 16.0,
+            "view": "v0",
+            "w": 16.140625,
+            "x": 54.984375,
+            "y": 168.0
+          }
+        ],
+        "id": "stat.deletions",
+        "kind": "quantity",
+        "role": "github.pr.deletions",
+        "text": "−9",
+        "unit": "lines deleted",
+        "value": 9,
+        "visible": true
+      },
+      {
+        "basis": "source",
+        "bounds": [
+          {
+            "h": 16.0,
+            "view": "v0",
+            "w": 37.484375,
+            "x": 85.125,
+            "y": 168.0
+          }
+        ],
+        "id": "stat.files",
+        "kind": "quantity",
+        "role": "github.pr.changed_files",
+        "text": "3 files",
+        "unit": "files changed",
+        "value": 3,
+        "visible": true
+      },
+      {
+        "basis": "source",
+        "bounds": [
+          {
+            "h": 16.0,
+            "view": "v0",
+            "w": 65.515625,
+            "x": 136.609375,
+            "y": 168.0
+          }
+        ],
+        "id": "stat.commits",
+        "kind": "quantity",
+        "role": "github.pr.commits",
+        "text": "2 commits",
+        "unit": "commits",
+        "value": 2,
+        "visible": true
+      },
+      {
+        "attrs": {
+          "github.commitId": "8ddaea31d4ab16c3b14296da851b1fedda843412",
+          "github.reviewer": "reviewer-a",
+          "github.submittedAt": "2026-11-16T06:00:00Z"
+        },
+        "basis": "source",
+        "bounds": [
+          {
+            "h": 34.0,
+            "view": "v0",
+            "w": 438.25,
+            "x": 16.0,
+            "y": 406.0
+          }
+        ],
+        "id": "review:5001",
+        "kind": "message",
+        "role": "github.review",
+        "text": "Please record the fallback path in the stamp so a reviewer can tell which source was used.",
+        "value": "changes_requested",
+        "visible": true
+      },
+      {
+        "attrs": {
+          "github.commitId": "71079ff11ab2847c1c2e5973b3901b2c7203c89d",
+          "github.reviewer": "reviewer-a",
+          "github.submittedAt": "2026-11-16T07:00:00Z"
+        },
+        "basis": "source",
+        "bounds": [
+          {
+            "h": 34.0,
+            "view": "v0",
+            "w": 149.53125,
+            "x": 16.0,
+            "y": 446.0
+          }
+        ],
+        "id": "review:5002",
+        "kind": "message",
+        "role": "github.review",
+        "text": "",
+        "value": "approved",
+        "visible": true
+      },
+      {
+        "basis": "source",
+        "bounds": [
+          {
+            "h": 112.0,
+            "view": "v0",
+            "w": 568.0,
+            "x": 16.0,
+            "y": 368.0
+          }
+        ],
+        "children": [
+          "review:5001",
+          "review:5002"
+        ],
+        "id": "reviews",
+        "kind": "list",
+        "role": "github.reviews",
+        "text": "Reviews",
+        "visible": true
+      },
+      {
+        "attrs": {
+          "github.additions": 51,
+          "github.deletions": 7,
+          "github.status": "modified"
+        },
+        "basis": "source",
+        "bounds": [
+          {
+            "h": 34.0,
+            "view": "v0",
+            "w": 207.328125,
+            "x": 16.0,
+            "y": 530.0
+          }
+        ],
+        "id": "file:tools/ship/upstream-canary.mjs",
+        "kind": "reference",
+        "role": "github.file",
+        "text": "tools/ship/upstream-canary.mjs",
+        "visible": true
+      },
+      {
+        "attrs": {
+          "github.additions": 11,
+          "github.deletions": 2,
+          "github.status": "modified"
+        },
+        "basis": "source",
+        "bounds": [
+          {
+            "h": 34.0,
+            "view": "v0",
+            "w": 161.953125,
+            "x": 16.0,
+            "y": 570.0
+          }
+        ],
+        "id": "file:tools/sync-upstream.mjs",
+        "kind": "reference",
+        "role": "github.file",
+        "text": "tools/sync-upstream.mjs",
+        "visible": true
+      },
+      {
+        "attrs": {
+          "github.additions": 2,
+          "github.deletions": 0,
+          "github.status": "modified"
+        },
+        "basis": "source",
+        "bounds": [
+          {
+            "h": 34.0,
+            "view": "v0",
+            "w": 97.890625,
+            "x": 16.0,
+            "y": 610.0
+          }
+        ],
+        "id": "file:docs/CI.md",
+        "kind": "reference",
+        "role": "github.file",
+        "text": "docs/CI.md",
+        "visible": true
+      },
+      {
+        "basis": "source",
+        "bounds": [
+          {
+            "h": 152.0,
+            "view": "v0",
+            "w": 568.0,
+            "x": 16.0,
+            "y": 492.0
+          }
+        ],
+        "children": [
+          "file:tools/ship/upstream-canary.mjs",
+          "file:tools/sync-upstream.mjs",
+          "file:docs/CI.md"
+        ],
+        "id": "files",
+        "kind": "list",
+        "role": "github.files",
+        "text": "Files changed",
+        "visible": true
+      },
+      {
+        "attrs": {
+          "github.author": "Guillermo",
+          "github.date": "2026-11-15T22:01:49-08:00",
+          "github.message": "Add top-right source link to header"
+        },
+        "basis": "source",
+        "bounds": [
+          {
+            "h": 34.0,
+            "view": "v0",
+            "w": 224.28125,
+            "x": 16.0,
+            "y": 694.0
+          }
+        ],
+        "id": "commit:8ddaea3",
+        "kind": "reference",
+        "role": "github.commit",
+        "text": "Add top-right source link to header",
+        "value": "8ddaea31d4ab16c3b14296da851b1fedda843412",
+        "visible": true
+      },
+      {
+        "attrs": {
+          "github.author": "Guillermo",
+          "github.date": "2026-11-15T22:46:40-08:00",
+          "github.message": "Fall back to live x-web bundle when profile SSR returns 403 on CI runners"
+        },
+        "basis": "source",
+        "bounds": [
+          {
+            "h": 34.0,
+            "view": "v0",
+            "w": 394.390625,
+            "x": 16.0,
+            "y": 734.0
+          }
+        ],
+        "id": "commit:71079ff",
+        "kind": "reference",
+        "role": "github.commit",
+        "text": "Fall back to live x-web bundle when profile SSR returns 403 …",
+        "value": "71079ff11ab2847c1c2e5973b3901b2c7203c89d",
+        "visible": true
+      },
+      {
+        "basis": "source",
+        "bounds": [
+          {
+            "h": 112.0,
+            "view": "v0",
+            "w": 568.0,
+            "x": 16.0,
+            "y": 656.0
+          }
+        ],
+        "children": [
+          "commit:8ddaea3",
+          "commit:71079ff"
+        ],
+        "id": "commits",
+        "kind": "list",
+        "role": "github.commits",
+        "text": "Commits",
+        "visible": true
+      },
+      {
+        "attrs": {
+          "github.author": "reviewer-b",
+          "github.createdAt": "2026-11-16T06:30:00Z"
+        },
+        "basis": "source",
+        "bounds": [
+          {
+            "h": 34.0,
+            "view": "v0",
+            "w": 356.859375,
+            "x": 16.0,
+            "y": 818.0
+          }
+        ],
+        "id": "comment:7001",
+        "kind": "message",
+        "role": "github.comment",
+        "text": "Does the fallback change the canary's pass criteria, or only where it reads the bundle from?",
+        "visible": true
+      },
+      {
+        "basis": "source",
+        "bounds": [
+          {
+            "h": 72.0,
+            "view": "v0",
+            "w": 568.0,
+            "x": 16.0,
+            "y": 780.0
+          }
+        ],
+        "children": [
+          "comment:7001"
+        ],
+        "id": "comments",
+        "kind": "list",
+        "role": "github.comments",
+        "text": "Comments",
+        "visible": true
+      }
+    ],
+    "relations": [
+      {
+        "basis": "source",
+        "from": "pr",
+        "kind": "authoredBy",
+        "to": "pr.author"
+      },
+      {
+        "basis": "source",
+        "from": "pr.head",
+        "kind": "mergesInto",
+        "to": "pr.base"
+      },
+      {
+        "basis": "source",
+        "from": "review:5001",
+        "kind": "reviews",
+        "to": "pr"
+      },
+      {
+        "basis": "source",
+        "from": "review:5002",
+        "kind": "reviews",
+        "to": "pr"
+      },
+      {
+        "basis": "source",
+        "from": "comment:7001",
+        "kind": "repliesTo",
+        "to": "pr"
+      }
+    ],
+    "root": "pr"
+  },
+  "state": {
+    "asOf": "2026-11-16T12:00:00Z",
+    "facts": [
+      {
+        "basis": "source",
+        "key": "state",
+        "sourceTime": "2026-11-16T07:02:11Z",
+        "subject": "pr",
+        "value": "open",
+        "volatile": true
+      },
+      {
+        "basis": "source",
+        "key": "merged",
+        "sourceTime": "2026-11-16T07:02:11Z",
+        "subject": "pr",
+        "value": false,
+        "volatile": true
+      },
+      {
+        "basis": "source",
+        "key": "draft",
+        "sourceTime": "2026-11-16T07:02:11Z",
+        "subject": "pr",
+        "value": false,
+        "volatile": true
+      },
+      {
+        "basis": "unknown",
+        "key": "mergeable",
+        "sourceTime": "2026-11-16T07:02:11Z",
+        "subject": "pr",
+        "value": null,
+        "volatile": true
+      },
+      {
+        "basis": "source",
+        "key": "mergeableState",
+        "sourceTime": "2026-11-16T07:02:11Z",
+        "subject": "pr",
+        "value": "unknown",
+        "volatile": true
+      },
+      {
+        "basis": "source",
+        "key": "headSha",
+        "sourceTime": "2026-11-16T07:02:11Z",
+        "subject": "pr",
+        "value": "71079ff11ab2847c1c2e5973b3901b2c7203c89d",
+        "volatile": true
+      },
+      {
+        "basis": "source",
+        "key": "updatedAt",
+        "sourceTime": "2026-11-16T07:02:11Z",
+        "subject": "pr",
+        "value": "2026-11-16T07:02:11Z",
+        "volatile": true
+      },
+      {
+        "basis": "source",
+        "key": "requestedReviewers",
+        "sourceTime": "2026-11-16T07:02:11Z",
+        "subject": "pr",
+        "value": [
+          "reviewer-b"
+        ],
+        "volatile": true
+      },
+      {
+        "basis": "derived",
+        "key": "reviewDecision",
+        "sourceTime": "2026-11-16T07:02:11Z",
+        "subject": "pr",
+        "value": "approved",
+        "volatile": true
+      }
+    ],
+    "temporal": "historical-observation"
+  },
+  "subject": {
+    "element": "pr",
+    "reference": "https://github.com/example-org/xeet/pull/7",
+    "title": "example-org/xeet#7 Fall back to the live x-web bundle when profile SSR returns 403",
+    "type": "github.pull_request"
+  },
+  "views": [
+    {
+      "asset": "sha256:802c409de76f8c02ea9f725832c55ff441a8397a6ff2e300a211019d60ed238f",
+      "config": {
+        "layoutVersion": "1",
+        "scale": 1.0,
+        "theme": "light",
+        "width": 600.0
+      },
+      "fidelity": {
+        "claim": "generic",
+        "target": "the pull request's content as a generic document; not a replica of github.com"
+      },
+      "id": "v0",
+      "layoutHeight": 868.0,
+      "layoutWidth": 600.0,
+      "mediaType": "image/png",
+      "pixelHeight": 868,
+      "pixelWidth": 600,
+      "renderer": {
+        "name": "xeet-capture/view",
+        "ruleset": "layout@1",
+        "version": "0.1.0"
+      },
+      "scale": 1.0
+    }
+  ]
+}

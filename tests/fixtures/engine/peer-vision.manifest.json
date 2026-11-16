@@ -1,0 +1,148 @@
+{
+  "format": "representation-engine.manifest",
+  "version": "0.1",
+  "provider": {
+    "id": "example-vision",
+    "name": "Example vision provider (HYPOTHETICAL test fixture)",
+    "version": "0.0.1",
+    "description": "A fixture standing in for a second provider, to test multi-provider discovery. It is not implemented anywhere."
+  },
+  "interfaces": [
+    {
+      "kind": "mcp-stdio",
+      "description": "hypothetical"
+    }
+  ],
+  "compatibility": {
+    "artifactFormat": "xeet-artifact",
+    "artifactVersionsRead": "0.x",
+    "artifactVersionWritten": "0.1",
+    "projectionFormat": "xeet-artifact.projection 0.1",
+    "contractVersion": "0.1",
+    "notes": []
+  },
+  "authority": {
+    "summary": "hypothetical",
+    "scopes": [
+      {
+        "id": "store:read",
+        "meaning": "read artifacts"
+      }
+    ]
+  },
+  "sources": [],
+  "capabilities": [
+    {
+      "id": "vision.read",
+      "version": "0.1",
+      "title": "Read text and values from an image",
+      "summary": "OCR and visual description of an arbitrary image, returned as inferred content.",
+      "description": "hypothetical",
+      "outcomes": [
+        "ocr an arbitrary image",
+        "read text from a photo",
+        "extract chart values from pixels",
+        "describe a picture"
+      ],
+      "inputModalities": [
+        "image/png"
+      ],
+      "modes": [
+        {
+          "output": [
+            "application/json"
+          ],
+          "select": {},
+          "note": "inferred elements"
+        }
+      ],
+      "inputSchema": {
+        "type": "object"
+      },
+      "outputSchema": {
+        "type": "object"
+      },
+      "effects": "none",
+      "consequential": false,
+      "authority": [
+        "store:read"
+      ],
+      "preconditions": [],
+      "guarantees": [
+        "every result is marked inferred"
+      ],
+      "limitations": [
+        "hypothetical"
+      ],
+      "constraints": {
+        "network": "none",
+        "deterministic": false,
+        "maxInputBytes": 1000000,
+        "notes": []
+      },
+      "errors": [
+        "invalid_input"
+      ]
+    },
+    {
+      "id": "representation.understand",
+      "version": "0.1",
+      "title": "Understand an artifact (projection for a consumer)",
+      "summary": "A second implementation of the same contract id, to test that discovery lists both providers.",
+      "description": "hypothetical",
+      "outcomes": [
+        "understand a screenshot without vision",
+        "read visual information as text"
+      ],
+      "inputModalities": [
+        "application/vnd.xeet-artifact+ref"
+      ],
+      "modes": [
+        {
+          "output": [
+            "text/plain"
+          ],
+          "select": {
+            "consumer": "text"
+          },
+          "note": "text"
+        }
+      ],
+      "inputSchema": {
+        "type": "object"
+      },
+      "outputSchema": {
+        "type": "object"
+      },
+      "effects": "none",
+      "consequential": false,
+      "authority": [
+        "store:read"
+      ],
+      "preconditions": [],
+      "guarantees": [],
+      "limitations": [
+        "hypothetical"
+      ],
+      "constraints": {
+        "network": "none",
+        "deterministic": true,
+        "maxInputBytes": 1000000,
+        "notes": []
+      },
+      "errors": [
+        "invalid_input"
+      ]
+    }
+  ],
+  "nonCapabilities": [],
+  "limitations": [
+    "hypothetical fixture"
+  ],
+  "constraints": {
+    "network": "none",
+    "deterministic": false,
+    "maxInputBytes": 1000000,
+    "notes": []
+  }
+}

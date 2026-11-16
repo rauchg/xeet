@@ -1,0 +1,37 @@
+{
+  "format": "model-input-capabilities",
+  "version": "0.1",
+  "provider": "example",
+  "model": "text-only-1",
+  "revision": "host-config-1",
+  "inputs": [
+    {
+      "mediaType": "text/plain",
+      "support": "supported",
+      "source": "configured"
+    },
+    {
+      "mediaType": "image/*",
+      "support": "unsupported",
+      "source": "configured"
+    },
+    {
+      "mediaType": "audio/*",
+      "support": "unsupported",
+      "source": "configured"
+    },
+    {
+      "mediaType": "application/pdf",
+      "support": "unsupported",
+      "source": "configured"
+    }
+  ],
+  "contextTokens": 16000,
+  "maxOutputTokens": 1024,
+  "charsPerToken": 4.0,
+  "structuredInput": "supported",
+  "source": "configured",
+  "notes": [
+    "A hypothetical text-only model, configured by the host for tests."
+  ]
+}

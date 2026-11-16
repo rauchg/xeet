@@ -1,0 +1,169 @@
+{
+  "_fixture": "Hand-authored reading of tests/fixtures/gateway/invoices.png, standing in for a vision provider in tests. Not produced by any model.",
+  "imageSha256": "sha256:15b81b83902b4c53bd08f121145633089af221c168fecfeaf267dcbe8cf86b9f",
+  "elements": [
+    {
+      "id": "reading",
+      "kind": "list",
+      "role": "vision.table",
+      "text": "Invoices table (Acme Billing · Receivables), as of 2026-11-16; columns Invoice, Customer, Amount, Due, Status",
+      "visible": true,
+      "basis": "inferred",
+      "children": [
+        "reading.INV-1041",
+        "reading.INV-1042",
+        "reading.INV-1043",
+        "reading.INV-1044",
+        "reading.INV-1045"
+      ],
+      "attrs": {
+        "vision.confidence": 0.93
+      }
+    },
+    {
+      "id": "reading.INV-1041",
+      "kind": "group",
+      "role": "vision.table-row",
+      "text": "INV-1041 · Northwind Traders · $1,200.00 · due 2026-10-01 · status: Overdue",
+      "visible": true,
+      "basis": "inferred",
+      "bounds": [
+        {
+          "view": "v0",
+          "x": 16,
+          "y": 146,
+          "w": 448,
+          "h": 34
+        }
+      ],
+      "attrs": {
+        "vision.confidence": 0.96,
+        "vision.fields": {
+          "invoice": "INV-1041",
+          "customer": "Northwind Traders",
+          "amount": "$1,200.00",
+          "due": "2026-10-01",
+          "status": "Overdue"
+        }
+      }
+    },
+    {
+      "id": "reading.INV-1042",
+      "kind": "group",
+      "role": "vision.table-row",
+      "text": "INV-1042 · Contoso Ltd · $480.00 · due 2026-11-30 · status: Open",
+      "visible": true,
+      "basis": "inferred",
+      "bounds": [
+        {
+          "view": "v0",
+          "x": 16,
+          "y": 186,
+          "w": 448,
+          "h": 34
+        }
+      ],
+      "attrs": {
+        "vision.confidence": 0.97,
+        "vision.fields": {
+          "invoice": "INV-1042",
+          "customer": "Contoso Ltd",
+          "amount": "$480.00",
+          "due": "2026-11-30",
+          "status": "Open"
+        }
+      }
+    },
+    {
+      "id": "reading.INV-1043",
+      "kind": "group",
+      "role": "vision.table-row",
+      "text": "INV-1043 · Fabrikam Inc · $2,950.00 · due 2026-09-15 · status: Overdue",
+      "visible": true,
+      "basis": "inferred",
+      "bounds": [
+        {
+          "view": "v0",
+          "x": 16,
+          "y": 226,
+          "w": 448,
+          "h": 34
+        }
+      ],
+      "attrs": {
+        "vision.confidence": 0.95,
+        "vision.fields": {
+          "invoice": "INV-1043",
+          "customer": "Fabrikam Inc",
+          "amount": "$2,950.00",
+          "due": "2026-09-15",
+          "status": "Overdue"
+        }
+      }
+    },
+    {
+      "id": "reading.INV-1044",
+      "kind": "group",
+      "role": "vision.table-row",
+      "text": "INV-1044 · Tailspin Toys · $130.00 · due 2026-11-01 · status: Paid",
+      "visible": true,
+      "basis": "inferred",
+      "bounds": [
+        {
+          "view": "v0",
+          "x": 16,
+          "y": 266,
+          "w": 448,
+          "h": 34
+        }
+      ],
+      "attrs": {
+        "vision.confidence": 0.97,
+        "vision.fields": {
+          "invoice": "INV-1044",
+          "customer": "Tailspin Toys",
+          "amount": "$130.00",
+          "due": "2026-11-01",
+          "status": "Paid"
+        }
+      }
+    },
+    {
+      "id": "reading.INV-1045",
+      "kind": "group",
+      "role": "vision.table-row",
+      "text": "INV-1045 · Wingtip Toys · $760.00 · due 2026-10-20 · status: unreadable (cut off: \"Overd…\")",
+      "visible": true,
+      "basis": "inferred",
+      "bounds": [
+        {
+          "view": "v0",
+          "x": 16,
+          "y": 306,
+          "w": 448,
+          "h": 34
+        }
+      ],
+      "attrs": {
+        "vision.confidence": 0.55,
+        "vision.fields": {
+          "invoice": "INV-1045",
+          "customer": "Wingtip Toys",
+          "amount": "$760.00",
+          "due": "2026-10-20",
+          "status": null
+        },
+        "vision.uncertain": "the status text is cut off (\"Overd…\"); it may read Overdue, but the full word is not visible"
+      }
+    }
+  ],
+  "facts": [
+    {
+      "subject": "reading",
+      "key": "rowCount",
+      "value": 5,
+      "basis": "inferred",
+      "volatile": false
+    }
+  ]
+}

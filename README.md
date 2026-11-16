@@ -67,6 +67,28 @@ Every image below is `xeet`'s own output, rendered in both light and dark themes
   quotes, cards, polls, video, the web/iOS differences, and safe link resolution.
   The full list is under [What it handles](#what-it-handles).
 
+## Artifacts
+
+`xeet artifact` turns an observation — an X post, or a GitHub pull request —
+into a durable, self-describing package: the rendered view for people, a
+semantic graph with bounds for machines, provenance, state as of capture,
+capabilities with explicit authority, and the producer's own limitations, all
+content-addressed and verifiable offline (including byte-for-byte
+reproduction of the view). The image is one projection of the artifact, not
+the artifact: `xeet artifact project` gives a text-only model the same
+information — elements, positions, layout rows, state, capabilities — with
+anything that exists only as pixels named, never guessed.
+`xeet engine mcp` serves it to agents: discovery by outcome and modality,
+versioned capability contracts ([`docs/engine.manifest.json`](docs/engine.manifest.json)),
+and per-session authority that discovery never grants.
+`xeet gateway` adapts inputs to what a target model can consume: a text-only
+model gets a provenance-preserving text representation of an image beside the
+user's unchanged instruction, with inference marked as inference
+([`docs/GATEWAY.md`](docs/GATEWAY.md)).
+`xeet capture` makes a screenshot a durable artifact and reads its text on the
+device (local OCR as inference); `apps/macos` is the menu-bar capture app
+(unverified: written without a Mac) ([`docs/CAPTURE.md`](docs/CAPTURE.md)). See [`docs/ARTIFACT.md`](docs/ARTIFACT.md).
+
 ## Running it
 
 ```bash

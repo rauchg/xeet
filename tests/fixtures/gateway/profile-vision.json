@@ -1,0 +1,43 @@
+{
+  "format": "model-input-capabilities",
+  "version": "0.1",
+  "provider": "example",
+  "model": "vision-1",
+  "revision": "host-config-1",
+  "inputs": [
+    {
+      "mediaType": "text/plain",
+      "support": "supported",
+      "source": "configured"
+    },
+    {
+      "mediaType": "image/png",
+      "support": "conditional",
+      "source": "configured",
+      "maxBytes": 20000000,
+      "maxWidth": 8000,
+      "maxHeight": 8000
+    },
+    {
+      "mediaType": "image/jpeg",
+      "support": "conditional",
+      "source": "configured",
+      "maxBytes": 20000000,
+      "maxWidth": 8000,
+      "maxHeight": 8000
+    },
+    {
+      "mediaType": "audio/*",
+      "support": "unsupported",
+      "source": "configured"
+    }
+  ],
+  "contextTokens": 128000,
+  "maxOutputTokens": 4096,
+  "charsPerToken": 4.0,
+  "structuredInput": "supported",
+  "source": "configured",
+  "notes": [
+    "A hypothetical vision-capable model, configured by the host for tests."
+  ]
+}
