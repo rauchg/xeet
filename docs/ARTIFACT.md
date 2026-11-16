@@ -337,6 +337,8 @@ or network announcement); grants are coarse scopes per session, not
 per-artifact or per-user; there is no rate limiting beyond the input-size
 limit and the renderer's own budgets.
 
+The modality gateway built on this provider is described in [`GATEWAY.md`](GATEWAY.md).
+
 ## 5. Architecture
 
 ```

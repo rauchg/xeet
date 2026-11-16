@@ -98,6 +98,64 @@ pub struct Outcome {
     pub authority_checked: Vec<String>,
 }
 
+/// Anything that implements capability contracts: this engine, or another
+/// provider (a vision reader, a remote service). The gateway and the
+/// transports invoke providers only through this, so a contract id means the
+/// same thing whichever provider serves it.
+pub trait Provider {
+    fn manifest(&self) -> &Manifest;
+    /// Runs one capability under the host's session. Implementations enforce
+    /// their contract's authority themselves; callers may check it first too.
+    fn invoke(&self, capability: &str, input: &Value, session: &Session) -> Outcome;
+}
+
+impl Provider for Engine {
+    fn manifest(&self) -> &Manifest {
+        &self.manifest
+    }
+    fn invoke(&self, capability: &str, input: &Value, session: &Session) -> Outcome {
+        Engine::invoke(self, capability, input, session)
+    }
+}
+
+/// Whether a session holds every scope a contract requires; the missing ones.
+pub fn missing_scopes(contract: &Contract, session: &Session) -> Vec<String> {
+    contract
+        .authority
+        .iter()
+        .filter(|s| !session.grants.contains(*s))
+        .cloned()
+        .collect()
+}
+
+/// The `fs:read` rule every component uses: the grant, and a path inside a
+/// host-given read root (after resolving symlinks and `..`).
+pub fn check_path(session: &Session, path: &str) -> Result<PathBuf, Error> {
+    if !session.grants.contains("fs:read") {
+        return Err(err(
+            "unauthorized",
+            "reading a path needs fs:read, which this session lacks",
+            json!({"missing": ["fs:read"]}),
+        ));
+    }
+    let p = Path::new(path)
+        .canonicalize()
+        .map_err(|e| err("not_found", format!("{path}: {e}"), Value::Null))?;
+    let inside = session
+        .read_roots
+        .iter()
+        .filter_map(|r| r.canonicalize().ok())
+        .any(|r| p.starts_with(r));
+    if !inside {
+        return Err(err(
+            "unauthorized",
+            format!("{path} is outside the read roots this host allows"),
+            json!({"readRoots": session.read_roots}),
+        ));
+    }
+    Ok(p)
+}
+
 pub struct Engine {
     pub store: Store,
     manifest: Manifest,
@@ -233,6 +291,31 @@ fn str_of<'v>(v: &'v Value, k: &str) -> Option<&'v str> {
     v.get(k).and_then(Value::as_str)
 }
 
+/// Standard base64 (with or without padding); `None` on invalid input.
+pub fn unb64(text: &str) -> Option<Vec<u8>> {
+    let mut out = Vec::with_capacity(text.len() * 3 / 4);
+    let (mut acc, mut bits) = (0u32, 0u32);
+    for c in text.bytes().filter(|c| !c.is_ascii_whitespace()) {
+        let v = match c {
+            b'A'..=b'Z' => c - b'A',
+            b'a'..=b'z' => c - b'a' + 26,
+            b'0'..=b'9' => c - b'0' + 52,
+            b'+' => 62,
+            b'/' => 63,
+            b'=' => break,
+            _ => return None,
+        } as u32;
+        acc = acc << 6 | v;
+        bits += 6;
+        if bits >= 8 {
+            bits -= 8;
+            out.push((acc >> bits) as u8);
+            acc &= (1 << bits) - 1;
+        }
+    }
+    Some(out)
+}
+
 pub fn b64(bytes: &[u8]) -> String {
     const T: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
@@ -256,30 +339,7 @@ impl Cx<'_> {
         if !self.checked.iter().any(|s| s == "fs:read") {
             self.checked.push("fs:read".into());
         }
-        if !self.session.grants.contains("fs:read") {
-            return Err(err(
-                "unauthorized",
-                "reading a path needs fs:read, which this session lacks",
-                json!({"missing": ["fs:read"]}),
-            ));
-        }
-        let p = Path::new(path)
-            .canonicalize()
-            .map_err(|e| err("not_found", format!("{path}: {e}"), Value::Null))?;
-        let inside = self
-            .session
-            .read_roots
-            .iter()
-            .filter_map(|r| r.canonicalize().ok())
-            .any(|r| p.starts_with(r));
-        if !inside {
-            return Err(err(
-                "unauthorized",
-                format!("{path} is outside the read roots this host allows"),
-                json!({"readRoots": self.session.read_roots}),
-            ));
-        }
-        Ok(p)
+        check_path(self.session, path)
     }
 
     fn load(&mut self, r: &str) -> Result<(Package, Artifact), Error> {
@@ -371,14 +431,14 @@ impl Cx<'_> {
                 }
                 let req: project::Request = serde_json::from_value(fields)
                     .map_err(|e| err("invalid_input", e.to_string(), Value::Null))?;
-                let body = project::render(&a, &req, form)
+                let (body, delivery) = project::render_with_report(&a, &req, form)
                     .map_err(|e| err("invalid_input", e, Value::Null))?;
                 let projection = match form {
                     project::Form::Json => serde_json::from_str(&body)
                         .map_err(|e| err("internal", e.to_string(), Value::Null))?,
                     project::Form::Text => Value::String(body),
                 };
-                let mut out = json!({"artifact": store::uri(&a.id), "format": if form == project::Form::Json { "json" } else { "text" }, "projection": projection});
+                let mut out = json!({"artifact": store::uri(&a.id), "format": if form == project::Form::Json { "json" } else { "text" }, "projection": projection, "delivery": delivery});
                 if req.consumer == project::Consumer::Vision {
                     let images: Vec<Value> = a
                         .views
@@ -454,6 +514,7 @@ impl Cx<'_> {
                         && text
                             .as_deref()
                             .is_none_or(|t| e.title.to_lowercase().contains(t))
+                        && str_of(i, "inputDigest").is_none_or(|d| e.inputs.iter().any(|x| x == d))
                 });
                 list.sort_by(|a, b| b.captured_at.cmp(&a.captured_at).then(a.id.cmp(&b.id)));
                 let total = list.len();
@@ -477,16 +538,23 @@ impl Cx<'_> {
     }
 
     fn capture(&mut self, i: &Value) -> Result<Value, Error> {
-        let bytes = match (i.get("data"), str_of(i, "path")) {
-            (Some(d), None) => canon::canonical(d).into_bytes(),
-            (None, Some(path)) => {
+        let bytes = match (i.get("data"), str_of(i, "path"), str_of(i, "dataBase64")) {
+            (Some(d), None, None) => canon::canonical(d).into_bytes(),
+            (None, None, Some(b)) => unb64(b).ok_or_else(|| {
+                err(
+                    "invalid_input",
+                    "dataBase64 is not valid base64",
+                    json!([{"pointer": "/dataBase64"}]),
+                )
+            })?,
+            (None, Some(path), None) => {
                 let p = self.check_fs(path)?;
                 std::fs::read(&p).map_err(|e| err("not_found", e.to_string(), Value::Null))?
             }
             _ => {
                 return Err(err(
                     "invalid_input",
-                    "give exactly one of data or path",
+                    "give exactly one of data, dataBase64 or path",
                     json!([{"pointer": "/data"}, {"pointer": "/path"}]),
                 ))
             }
@@ -543,6 +611,13 @@ impl Cx<'_> {
                     extra_inputs: extra,
                 })
             }
+            Some("image") => xeet_capture::image::capture(&xeet_capture::image::Capture {
+                bytes: &bytes,
+                captured_at,
+                method,
+                declared_name: str_of(i, "name").map(str::to_string),
+                declared_type: str_of(i, "declaredType").map(str::to_string),
+            }),
             Some("github.pull_request") => github::capture(&github::Capture {
                 bundle_json: &bytes,
                 width: width.unwrap_or(600.0) as f32,

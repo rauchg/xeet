@@ -349,6 +349,50 @@ pub const BUDGET_PRIORITY: &[Section] = &[
 /// breadth-first, as fit. Everything left out is listed under `omitted`, so
 /// a consumer can ask for it by id or section.
 pub fn render(a: &Artifact, req: &Request, form: Form) -> Result<String, String> {
+    render_with_report(a, req, form).map(|(s, _)| s)
+}
+
+/// What a rendered projection delivered and left out: the record a caller
+/// keeps about what a consumer actually received.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct Delivery {
+    pub chars: usize,
+    pub elements_included: usize,
+    pub omitted: Omitted,
+    pub compact_capabilities: bool,
+    /// Included elements whose content was inferred, and which are visual-only.
+    pub inferred: Vec<String>,
+    pub visual_only: Vec<String>,
+}
+
+fn delivery(p: &Projection, s: &str) -> Delivery {
+    Delivery {
+        chars: s.chars().count(),
+        elements_included: p.elements.len(),
+        omitted: p.omitted.clone(),
+        compact_capabilities: p.capabilities.iter().any(|c| c.input_schema.is_none()),
+        inferred: p
+            .elements
+            .iter()
+            .filter(|e| e.basis == Basis::Inferred)
+            .map(|e| e.id.clone())
+            .collect(),
+        visual_only: p
+            .elements
+            .iter()
+            .filter(|e| e.availability == Availability::VisualOnly)
+            .map(|e| e.id.clone())
+            .collect(),
+    }
+}
+
+/// [`render`], plus the [`Delivery`] report for exactly what was rendered.
+pub fn render_with_report(
+    a: &Artifact,
+    req: &Request,
+    form: Form,
+) -> Result<(String, Delivery), String> {
     let order = candidate_order(a, req)?;
     let serialize = |p: &Projection| match form {
         Form::Text => text(p),
@@ -373,10 +417,14 @@ pub fn render(a: &Artifact, req: &Request, form: Form) -> Result<String, String>
         (p, s)
     };
     let Some(budget) = req.max_chars else {
-        return Ok(build(req, order.len()).1);
+        let (p, s) = build(req, order.len());
+        let d = delivery(&p, &s);
+        return Ok((s, d));
     };
     if build(req, order.len()).1.chars().count() <= budget {
-        return Ok(build(req, order.len()).1);
+        let (p, s) = build(req, order.len());
+        let d = delivery(&p, &s);
+        return Ok((s, d));
     }
     let fits = |r: &Request, k: usize| build(r, k).1.chars().count() <= budget;
 
@@ -404,7 +452,9 @@ pub fn render(a: &Artifact, req: &Request, form: Form) -> Result<String, String>
     let Some(base) = largest_prefix(top, |k| fits(&r, k)) else {
         let (mut p, _) = build(&r, 1);
         p.omitted.budget_exceeded = true;
-        return Ok(serialize(&p));
+        let s = serialize(&p);
+        let d = delivery(&p, &s);
+        return Ok((s, d));
     };
     // A strict prefix of the priority order: a larger budget never keeps
     // fewer sections, and a less important section never displaces a more
@@ -428,7 +478,9 @@ pub fn render(a: &Artifact, req: &Request, form: Form) -> Result<String, String>
     let k = largest_prefix(order.len(), |k| k <= base || fits(&r, k))
         .unwrap_or(base)
         .max(base);
-    Ok(build(&r, k).1)
+    let (p, s) = build(&r, k);
+    let d = delivery(&p, &s);
+    Ok((s, d))
 }
 
 /// The largest `k` in `1..=n` with `fits(k)`, assuming fit is monotone.

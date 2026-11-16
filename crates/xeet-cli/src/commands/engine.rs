@@ -15,7 +15,7 @@ use std::io::BufRead;
 use std::path::{Path, PathBuf};
 use xeet_engine::contract::{self, Manifest};
 use xeet_engine::discover::{self, Query};
-use xeet_engine::{store, Engine, Outcome, Session};
+use xeet_engine::{store, Engine, Outcome, Provider, Session};
 
 pub const USAGE: &str = "\
 engine manifest                          the provider manifest (JSON)
@@ -213,7 +213,8 @@ fn meta_tools() -> Value {
         {"name": "engine_invoke", "title": "Invoke a capability",
          "description": "Run one capability by id with input matching its contract. The session's authority is checked per call; errors name missing scopes or the exact invalid fields. Returns a verifiable outcome (input and result digests).",
          "inputSchema": {"type": "object", "additionalProperties": false, "required": ["capability"], "properties": {
-            "capability": {"type": "string"}, "input": {"type": "object"}}},
+            "capability": {"type": "string"}, "input": {"type": "object"},
+            "provider": {"type": "string", "description": "optional: which provider, when several implement the capability"}}},
          "annotations": {"readOnlyHint": false, "destructiveHint": false, "openWorldHint": false}}
     ])
 }
@@ -254,6 +255,17 @@ fn content(out: &Outcome) -> Value {
                     json!({"type": "image", "mimeType": img["mediaType"], "data": img["data"]}),
                 );
                 structured["result"]["images"][i]["data"] = json!("(in an image content block)");
+            }
+        }
+        // Content prepared for a model (modality.adapt): its text parts, as text.
+        for part in r
+            .get("content")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+        {
+            if let Some(text) = part.get("text").and_then(Value::as_str) {
+                content.push(json!({"type": "text", "text": text}));
             }
         }
         if let Some(Value::String(text)) = r.get("projection") {
@@ -313,7 +325,18 @@ fn resource_read(e: &Engine, s: &Session, uri: &str) -> Result<Value, String> {
 fn mcp(args: &Args) -> Result<u8, String> {
     let e = engine(args)?;
     let s = session(args);
-    let peers = manifests(args)?;
+    // The engine and the modality gateway (over the engine) are served side
+    // by side; both are reached only through their contracts.
+    let gw = xeet_gateway::provider::GatewayProvider::new(vec![&e as &dyn Provider]);
+    let providers: Vec<&dyn Provider> = vec![&e, &gw];
+    let mut peers = manifests(args)?;
+    peers.insert(1, gw.manifest().clone());
+    let route = |cap: &str, provider: Option<&str>| -> Option<&dyn Provider> {
+        providers.iter().copied().find(|p| {
+            provider.is_none_or(|id| p.manifest().provider.id == id)
+                && p.manifest().capabilities.iter().any(|c| c.id == cap)
+        })
+    };
     let progressive = args.value("tools").unwrap_or("progressive") != "all";
     let stdin = std::io::stdin();
     let mut stdout = std::io::stdout();
@@ -352,7 +375,20 @@ fn mcp(args: &Args) -> Result<u8, String> {
             })),
             "ping" => Ok(json!({})),
             "tools/list" => {
-                Ok(json!({"tools": if progressive { meta_tools() } else { all_tools(m) }}))
+                let all = || {
+                    Value::Array(
+                        providers
+                            .iter()
+                            .flat_map(|p| {
+                                all_tools(p.manifest())
+                                    .as_array()
+                                    .cloned()
+                                    .unwrap_or_default()
+                            })
+                            .collect(),
+                    )
+                };
+                Ok(json!({"tools": if progressive { meta_tools() } else { all() }}))
             }
             "tools/call" => {
                 let name = params.get("name").and_then(Value::as_str).unwrap_or("");
@@ -371,16 +407,21 @@ fn mcp(args: &Args) -> Result<u8, String> {
                     }
                     "engine_invoke" => {
                         let cap = a.get("capability").and_then(Value::as_str).unwrap_or("");
-                        content(&e.invoke(cap, &a.get("input").cloned().unwrap_or(json!({})), &s))
+                        let input = a.get("input").cloned().unwrap_or(json!({}));
+                        match route(cap, a.get("provider").and_then(Value::as_str)) {
+                            Some(p) => content(&p.invoke(cap, &input, &s)),
+                            // Let the engine produce its standard not_found outcome.
+                            None => content(&e.invoke(cap, &input, &s)),
+                        }
                     }
                     other => {
-                        let cap = m
-                            .capabilities
+                        let cap = providers
                             .iter()
+                            .flat_map(|p| p.manifest().capabilities.iter())
                             .find(|c| tool_name(&c.id) == other)
                             .map(|c| c.id.clone());
-                        match cap {
-                            Some(cap) if !progressive => content(&e.invoke(&cap, &a, &s)),
+                        match cap.as_deref().and_then(|c| route(c, None).map(|p| (c, p))) {
+                            Some((cap, p)) if !progressive => content(&p.invoke(cap, &a, &s)),
                             _ => {
                                 json!({"content": [{"type": "text", "text": format!("unknown tool {other}; use engine_discover")}], "isError": true})
                             }

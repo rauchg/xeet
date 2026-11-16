@@ -26,6 +26,10 @@ pub struct Entry {
     pub captured_at: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub derived_from: Option<String>,
+    /// Digests of the source inputs the artifact preserves.
+    pub inputs: Vec<String>,
+    /// How many elements carry inferred content (readings added by annotate).
+    pub inferred: usize,
 }
 
 /// `artifact://sha256/<hex>`: the URI form of an artifact id.
@@ -113,6 +117,18 @@ impl Store {
                 reference: a.subject.reference.clone(),
                 captured_at: a.provenance.capture.captured_at.clone(),
                 derived_from: a.provenance.derived_from.clone(),
+                inputs: a
+                    .provenance
+                    .inputs
+                    .iter()
+                    .map(|i| i.asset.clone())
+                    .collect(),
+                inferred: a
+                    .semantic
+                    .elements
+                    .iter()
+                    .filter(|e| e.basis == xeet_artifact::Basis::Inferred)
+                    .count(),
             });
         }
         out

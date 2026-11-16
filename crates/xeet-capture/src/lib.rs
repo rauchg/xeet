@@ -12,6 +12,7 @@
 #![forbid(unsafe_code)]
 
 pub mod github;
+pub mod image;
 pub mod view;
 pub mod x;
 
@@ -79,7 +80,7 @@ pub struct Reproducers;
 
 impl Reproducer for Reproducers {
     fn handles(&self, adapter: &str) -> bool {
-        adapter == x::ADAPTER || adapter == github::ADAPTER
+        adapter == x::ADAPTER || adapter == github::ADAPTER || adapter == image::ADAPTER
     }
 
     fn reproduce(
@@ -110,6 +111,13 @@ impl Reproducer for Reproducers {
                 let bundle = input(github::INPUT_ROLE)?;
                 for v in &artifact.views {
                     out.insert(v.id.clone(), github::render_view(bundle, &v.config)?);
+                }
+            }
+            image::ADAPTER => {
+                // The view is the input: reproduction is identity, checked by hash.
+                let bytes = input(image::INPUT_ROLE)?;
+                for v in &artifact.views {
+                    out.insert(v.id.clone(), bytes.to_vec());
                 }
             }
             other => return Err(format!("unknown adapter {other}")),

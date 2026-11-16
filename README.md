@@ -80,7 +80,11 @@ information — elements, positions, layout rows, state, capabilities — with
 anything that exists only as pixels named, never guessed.
 `xeet engine mcp` serves it to agents: discovery by outcome and modality,
 versioned capability contracts ([`docs/engine.manifest.json`](docs/engine.manifest.json)),
-and per-session authority that discovery never grants. See [`docs/ARTIFACT.md`](docs/ARTIFACT.md).
+and per-session authority that discovery never grants.
+`xeet gateway` adapts inputs to what a target model can consume: a text-only
+model gets a provenance-preserving text representation of an image beside the
+user's unchanged instruction, with inference marked as inference
+([`docs/GATEWAY.md`](docs/GATEWAY.md)). See [`docs/ARTIFACT.md`](docs/ARTIFACT.md).
 
 ## Running it
 

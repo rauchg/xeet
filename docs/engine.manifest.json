@@ -47,7 +47,11 @@
       ],
       "id": "representation.capture",
       "inputModalities": [
-        "application/json"
+        "application/json",
+        "image/png",
+        "image/jpeg",
+        "image/gif",
+        "image/webp"
       ],
       "inputSchema": {
         "additionalProperties": false,
@@ -60,8 +64,20 @@
             "description": "x.post: a model::Post or `xeet resolve` output; github.pull_request: {pull, reviews?, comments?, files?, commits?, apiVersion?} of REST responses",
             "type": "object"
           },
+          "dataBase64": {
+            "description": "image: the file's bytes, base64",
+            "type": "string"
+          },
+          "declaredType": {
+            "description": "image: a declared media type (recorded and checked against the bytes, not trusted)",
+            "type": "string"
+          },
           "method": {
             "description": "how the data was obtained: draft, source-payload, api-response, fixture",
+            "type": "string"
+          },
+          "name": {
+            "description": "image: a declared filename (recorded, not trusted)",
             "type": "string"
           },
           "options": {
@@ -107,7 +123,8 @@
           "source": {
             "enum": [
               "x.post",
-              "github.pull_request"
+              "github.pull_request",
+              "image"
             ]
           },
           "sourceId": {
@@ -121,7 +138,8 @@
         "type": "object"
       },
       "limitations": [
-        "two source types today: x.post and github.pull_request",
+        "three source types today: x.post, github.pull_request, image",
+        "image: identifies format and dimensions and keeps the bytes; does NOT read the content (visual-only until annotated)",
         "no network: source data must be supplied",
         "authenticity of the source data is recorded as unverified"
       ],
@@ -143,7 +161,10 @@
         "create an artifact",
         "convert source data into a visual and semantic representation",
         "render a post with semantics",
-        "snapshot a pull request"
+        "snapshot a pull request",
+        "represent an image file",
+        "ingest an image",
+        "identify and measure an image"
       ],
       "outputSchema": {
         "properties": {
@@ -196,10 +217,10 @@
         "type": "object"
       },
       "preconditions": [
-        "exactly one of data or path",
+        "exactly one of data, dataBase64 or path",
         "path inputs also need fs:read and must lie inside an allowed read root"
       ],
-      "summary": "Turn source data (an X post, a GitHub pull request) into a verified artifact: a visual view plus semantics, state, provenance, capabilities and limitations.",
+      "summary": "Turn source data (an X post, a GitHub pull request, an image file) into a verified artifact: a visual view plus semantics, state, provenance, capabilities and limitations.",
       "title": "Capture an observation as an artifact",
       "version": "0.1"
     },
@@ -542,6 +563,17 @@
         "properties": {
           "artifact": {
             "type": "string"
+          },
+          "delivery": {
+            "description": "what this projection delivered and left out",
+            "required": [
+              "chars",
+              "elementsIncluded",
+              "omitted",
+              "inferred",
+              "visualOnly"
+            ],
+            "type": "object"
           },
           "format": {
             "enum": [
@@ -1025,6 +1057,10 @@
       "inputSchema": {
         "additionalProperties": false,
         "properties": {
+          "inputDigest": {
+            "description": "sha256:<hex> of a source input: finds artifacts already made from the same bytes, so they are reused rather than recreated",
+            "type": "string"
+          },
           "limit": {
             "default": 50,
             "maximum": 500,
@@ -1087,7 +1123,7 @@
         "type": "object"
       },
       "preconditions": [],
-      "summary": "List stored artifacts, filtered by source type, subject reference or text in the title.",
+      "summary": "List stored artifacts, filtered by source type, subject reference, title text, or the digest of a source input (for reuse).",
       "title": "Find artifacts in the store",
       "version": "0.1"
     },
@@ -1284,7 +1320,7 @@
     }
   ],
   "limitations": [
-    "two source types",
+    "three source types; images are identified and measured, not interpreted",
     "no OCR or image interpretation",
     "no network",
     "artifact authenticity is always unverified",
@@ -1351,6 +1387,25 @@
       ],
       "type": "x.post",
       "visualFidelity": "oracle-verified against Chrome for the ruleset's verified surfaces"
+    },
+    {
+      "adapter": "xeet-capture/image",
+      "adapterVersion": "0.1.0",
+      "coverage": {
+        "bounds": "partial",
+        "capabilities": "not-applicable",
+        "provenance": "partial",
+        "reproduction": "supported",
+        "semantic": "not-supported",
+        "state": "partial",
+        "visual": "supported"
+      },
+      "input": "PNG, JPEG, GIF or WebP bytes, identified by content (magic bytes), not by name or declared type",
+      "notes": [
+        "format, dimensions and digest only; the content is visual-only until a reader annotates it as inference"
+      ],
+      "type": "image",
+      "visualFidelity": "original: the view is the source bytes"
     },
     {
       "adapter": "xeet-capture/github",

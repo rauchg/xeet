@@ -212,6 +212,8 @@ pub enum FidelityClaim {
     OracleVerified,
     /// A faithful layout of the content, not a replica of any product UI.
     Generic,
+    /// The view is the source's own bytes (an image file), unchanged.
+    Original,
     #[default]
     None,
 }

@@ -1,0 +1,15 @@
+[package]
+name = "xeet-gateway"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "Modality gateway: makes inputs consumable by a model regardless of its native input modalities, by discovering providers, transforming through their contracts, and injecting provenance-preserving projections into provider-neutral model requests."
+
+[dependencies]
+xeet-engine = { path = "../xeet-engine" }
+xeet-artifact = { path = "../xeet-artifact" }
+xeet-capture = { path = "../xeet-capture" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"

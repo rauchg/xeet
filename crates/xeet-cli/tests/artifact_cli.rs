@@ -393,9 +393,97 @@ fn a_text_only_agent_discovers_and_uses_the_engine_over_mcp() {
             ),
         ],
     );
-    assert_eq!(r[0]["result"]["tools"].as_array().unwrap().len(), 10);
+    assert_eq!(
+        r[0]["result"]["tools"].as_array().unwrap().len(),
+        11,
+        "engine + gateway contracts"
+    );
     assert_eq!(r[1]["result"]["structuredContent"]["ok"], true);
 
     let _ = std::fs::remove_dir_all(store);
     let _ = std::fs::remove_file(input);
+}
+
+#[test]
+fn an_agent_finds_and_uses_the_modality_gateway_over_mcp() {
+    let store = tmp("mcp-gateway");
+    let store_s = store.to_str().unwrap().to_string();
+    let png = std::fs::read(root().join("tests/fixtures/gateway/invoices.png")).unwrap();
+    let b64 = {
+        // Standard base64, enough for a test.
+        const T: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+        let mut out = String::new();
+        for c in png.chunks(3) {
+            let n = (c[0] as u32) << 16
+                | (*c.get(1).unwrap_or(&0) as u32) << 8
+                | *c.get(2).unwrap_or(&0) as u32;
+            for i in 0..4 {
+                out.push(if i <= c.len() {
+                    T[(n >> (18 - 6 * i) & 63) as usize] as char
+                } else {
+                    '='
+                });
+            }
+        }
+        out
+    };
+    let profile: serde_json::Value = serde_json::from_slice(
+        &std::fs::read(root().join("tests/fixtures/gateway/profile-text-only.json")).unwrap(),
+    )
+    .unwrap();
+    let ask = "Which invoices are overdue?";
+    let r = mcp(
+        &["--store", &store_s, "--grant", "store:read,store:write"],
+        &[
+            call(
+                1,
+                "engine_discover",
+                serde_json::json!({"outcome": "the model does not support images", "accepts": ["text/plain"]}),
+            ),
+            call(
+                2,
+                "engine_invoke",
+                serde_json::json!({"capability": "modality.adapt", "input": {
+                "instruction": ask, "model": profile, "now": "2026-11-16T12:00:00Z",
+                "inputs": [{"dataBase64": b64, "name": "invoices.png"}]}}),
+            ),
+        ],
+    );
+    let top = &r[0]["result"]["structuredContent"]["matches"][0];
+    assert_eq!(
+        (top["provider"].as_str(), top["capability"].as_str()),
+        (Some("xeet-gateway"), Some("modality.adapt")),
+        "{}",
+        r[0]
+    );
+    let out = &r[1]["result"];
+    assert_eq!(out["isError"], false, "{out}");
+    let blocks: Vec<&str> = out["content"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|c| c["type"].as_str().unwrap())
+        .collect();
+    assert!(
+        blocks.iter().all(|t| *t == "text"),
+        "no image blocks for a text-only profile: {blocks:?}"
+    );
+    let content = &out["structuredContent"]["result"]["content"];
+    assert_eq!(
+        content[0],
+        serde_json::json!({"type": "text", "text": ask}),
+        "instruction first, unchanged"
+    );
+    assert!(
+        content[1]["text"]
+            .as_str()
+            .unwrap()
+            .contains("[visual-only]"),
+        "no reader here: content declared unknown"
+    );
+    assert!(
+        !out.to_string().contains("iVBOR"),
+        "no image bytes returned to a text-only client"
+    );
+    let _ = std::fs::remove_dir_all(store);
 }
