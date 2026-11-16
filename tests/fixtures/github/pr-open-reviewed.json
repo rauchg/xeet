@@ -1,0 +1,47 @@
+{
+  "_fixture": "Constructed in the shape of GitHub REST API responses (apiVersion 2022-11-28) for adapter tests. It is NOT a recorded response: no pull request with this number exists. Commit SHAs, messages and dates are real commits of this repository; logins other than the repository author are placeholders.",
+  "apiVersion": "2022-11-28",
+  "pull": {
+    "id": 900000001,
+    "number": 7,
+    "state": "open",
+    "draft": false,
+    "merged": false,
+    "merged_at": null,
+    "closed_at": null,
+    "title": "Fall back to the live x-web bundle when profile SSR returns 403",
+    "body": "CI runners get a 403 from the profile SSR endpoint, so the upstream canary failed for reasons unrelated to X's rules.\n\nThis falls back to the live x-web bundle and records which path was used in the stamp.\n\n- [x] canary passes on CI\n- [ ] document the fallback in docs/CI.md",
+    "html_url": "https://github.com/example-org/xeet/pull/7",
+    "user": { "login": "rauchg", "html_url": "https://github.com/rauchg" },
+    "labels": [ { "name": "ci" }, { "name": "upstream" } ],
+    "requested_reviewers": [ { "login": "reviewer-b" } ],
+    "base": { "ref": "main", "repo": { "full_name": "example-org/xeet" } },
+    "head": { "ref": "canary-403", "label": "example-org:canary-403", "sha": "71079ff11ab2847c1c2e5973b3901b2c7203c89d" },
+    "mergeable": null,
+    "mergeable_state": "unknown",
+    "created_at": "2026-11-16T05:10:00Z",
+    "updated_at": "2026-11-16T07:02:11Z",
+    "additions": 64,
+    "deletions": 9,
+    "changed_files": 3,
+    "commits": 2,
+    "comments": 1,
+    "review_comments": 0
+  },
+  "reviews": [
+    { "id": 5001, "user": { "login": "reviewer-a" }, "state": "CHANGES_REQUESTED", "body": "Please record the fallback path in the stamp so a reviewer can tell which source was used.", "submitted_at": "2026-11-16T06:00:00Z", "commit_id": "8ddaea31d4ab16c3b14296da851b1fedda843412" },
+    { "id": 5002, "user": { "login": "reviewer-a" }, "state": "APPROVED", "body": "", "submitted_at": "2026-11-16T07:00:00Z", "commit_id": "71079ff11ab2847c1c2e5973b3901b2c7203c89d" }
+  ],
+  "comments": [
+    { "id": 7001, "user": { "login": "reviewer-b" }, "body": "Does the fallback change the canary's pass criteria, or only where it reads the bundle from?", "created_at": "2026-11-16T06:30:00Z" }
+  ],
+  "files": [
+    { "filename": "tools/ship/upstream-canary.mjs", "status": "modified", "additions": 51, "deletions": 7 },
+    { "filename": "tools/sync-upstream.mjs", "status": "modified", "additions": 11, "deletions": 2 },
+    { "filename": "docs/CI.md", "status": "modified", "additions": 2, "deletions": 0 }
+  ],
+  "commits": [
+    { "sha": "8ddaea31d4ab16c3b14296da851b1fedda843412", "html_url": "https://github.com/example-org/xeet/commit/8ddaea31d4ab16c3b14296da851b1fedda843412", "commit": { "message": "Add top-right source link to header", "author": { "name": "Guillermo", "date": "2026-11-15T22:01:49-08:00" } } },
+    { "sha": "71079ff11ab2847c1c2e5973b3901b2c7203c89d", "html_url": "https://github.com/example-org/xeet/commit/71079ff11ab2847c1c2e5973b3901b2c7203c89d", "commit": { "message": "Fall back to live x-web bundle when profile SSR returns 403 on CI runners", "author": { "name": "Guillermo", "date": "2026-11-15T22:46:40-08:00" } } }
+  ]
+}

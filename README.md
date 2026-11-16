@@ -67,6 +67,16 @@ Every image below is `xeet`'s own output, rendered in both light and dark themes
   quotes, cards, polls, video, the web/iOS differences, and safe link resolution.
   The full list is under [What it handles](#what-it-handles).
 
+## Artifacts
+
+`xeet artifact` turns an observation — an X post, or a GitHub pull request —
+into a durable, self-describing package: the rendered view for people, a
+semantic graph with bounds for machines, provenance, state as of capture,
+capabilities with explicit authority, and the producer's own limitations, all
+content-addressed and verifiable offline (including byte-for-byte
+reproduction of the view). The image is one projection of the artifact, not
+the artifact. See [`docs/ARTIFACT.md`](docs/ARTIFACT.md).
+
 ## Running it
 
 ```bash

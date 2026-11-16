@@ -1,0 +1,312 @@
+# Artifacts
+
+An **artifact** is one captured observation of something — a post, a pull
+request — held as several coordinated representations of that same
+observation, with every byte it refers to content-addressed:
+
+| section        | answers                                                           | for         |
+|----------------|-------------------------------------------------------------------|-------------|
+| `views`        | what it looked like (PNG, with renderer, config, fidelity claim)  | humans      |
+| `semantic`     | what it means: typed elements, relations, bounds into each view   | machines    |
+| `provenance`   | where it came from, how, by which tools, from which preserved bytes | both      |
+| `state`        | what was true *at capture time*, each fact with its basis         | both        |
+| `capabilities` | what could be done, by which executor, with whose authority       | both        |
+| `limitations`  | what was omitted, approximated, derived, inferred, unverified     | both        |
+| `coverage`     | which aspects this adapter supports at all                        | both        |
+
+The image is one projection of the artifact. It is not the artifact.
+
+```bash
+xeet artifact capture x tests/fixtures/posts/links-card.json -o post --width 390
+xeet artifact capture github tests/fixtures/github/pr-open-reviewed.json -o pr --method fixture
+xeet artifact verify pr          # integrity + byte-for-byte reproduction of the view
+xeet artifact inspect pr         # human-readable account
+xeet artifact capabilities pr    # what could be done, and with whose authority
+xeet artifact compare a b        # what changed between two observations
+xeet artifact project post retheme --input '{"theme":"dark"}' -o post-dark
+xeet artifact mcp                # the read-only operations as an MCP server (stdio)
+```
+
+Two committed examples, verifiable offline: [`artifacts/x-post`](artifacts/x-post),
+[`artifacts/github-pr`](artifacts/github-pr).
+
+---
+
+## 1. Assessment of xeet (what this was built on)
+
+Checked against the code and tests, not the README.
+
+**Reused directly, unchanged**
+
+- The X renderer: `xeet_core::render::render` (`crates/xeet-core/src/render.rs`).
+  The X adapter's view *is* its PNG — a test asserts byte equality
+  (`the_x_view_is_the_existing_renderers_bytes`).
+- The `Report` (`model.rs`): ruleset id, visible text, entities with UTF-16
+  ranges, hidden ranges with reasons, attachment decision, warnings. This is
+  already a decision log; the adapter maps it to semantics and limitations.
+- The frame's named geometry (`frame::layout_debug`, `Geometry::boxes`): the
+  boxes `examples/frame_parity.rs` gates against Chrome at 1/64 px. Until now
+  only the oracle harness could reach them.
+- Text layout and painting (`inline::layout`, `DisplayList`, `paint::rasterize_png`):
+  HarfBuzz shaping, Blink line breaking, embedded fonts, no I/O. The generic
+  view renderer is built on these.
+- The I/O boundary of `xeet-resolve` (caller-supplied `Fetch`/`Clock`): the
+  adapters follow the same rule — the caller supplies bytes and time.
+- `xeet resolve` output (`{post, links, media, source, warnings}`): accepted as
+  capture input; `source.url`/`source.id` become provenance.
+
+**Changed in xeet-core**: one additive function, `render::frame_boxes`
+(14 lines), exposing the existing geometry. Nothing else in the renderer moved.
+
+**What prevented universal use**
+
+- `Post` is the only content model; `Report` is X vocabulary (`entities`,
+  `hidden`, `attachment`). Fine as an adapter's input, wrong as a core type.
+- The renderer is the X frame. A second source needs either its own renderer
+  or a generic one; there was none.
+- No provenance beyond `Source {url, id, appVersion}`; no capture time (by
+  design: the core has no clock); no notion of basis, state, or capability.
+- "MCP" was tool *definitions* served over HTTP (`packages/xeet/src/mcp.js`),
+  not a server.
+
+**Guarantees that must not regress, and their status**
+
+| guarantee | evidence after this change |
+|---|---|
+| Rust test suite | `cargo test --workspace`: 363 pass, 0 fail (baseline 348; +15 new) |
+| No `unsafe` | `node tools/ship/check-unsafe.mjs`: new crates report none; both `#![forbid(unsafe_code)]` |
+| Model/schema/limits/MCP contract | `node tools/ship/check-contract.mjs`: passes |
+| Native = WASM bytes | renderer untouched; no workspace-wide dependency feature added (see §6); `cargo check -p xeet-wasm --target wasm32-unknown-unknown` passes. The wasm-pack determinism gate itself was **not** run here. |
+| Chrome oracle gates | not run here (need Playwright Chrome + upstream assets); renderer code unchanged |
+
+---
+
+## 2. The contract (format `xeet-artifact`, version `0.1`)
+
+Types: [`crates/xeet-artifact/src/model.rs`](../crates/xeet-artifact/src/model.rs).
+
+### Package
+
+```
+artifact.json                  the document (pretty JSON, sorted keys)
+assets/<sha256-hex>.<ext>      every view and every preserved input
+```
+
+Asset paths are derived from content (`assets/<hex>.png|json|txt|bin`). An
+artifact's `id` is `sha256:` of the canonical document with `id` set to `""`.
+Canonical = compact JSON, keys sorted by UTF-8 bytes at every level, **number
+tokens kept exactly as written** (`canon::document_id_from_text`), so identity
+never depends on a float parser. Same observation, same id: the debug and
+optimized builds produce the same id for the same inputs.
+
+### Basis — never promote an inference to a fact
+
+Every element, relation and fact carries one of:
+
+| basis | meaning |
+|---|---|
+| `source` | supplied by the source data as-is |
+| `observed` | measured by the capturing tool |
+| `derived` | computed by a declared deterministic rule (re-running gives the same answer) |
+| `inferred` | non-deterministic or heuristic (a model, OCR) — must be declared, by subject, in `limitations.inferred` or verification fails |
+| `unknown` | not known; the value must be `null`, and `null` only goes with `unknown` |
+
+Neither adapter emits `inferred` anything. Verification enforces the rules.
+
+### Semantic model
+
+Elements use a closed universal vocabulary of kinds — `record identity text
+heading timestamp link reference media quantity status label list group
+message affordance` — plus namespaced extensions (`x.something`), reported as
+such. Source meaning lives in namespaced `role`s and `attrs` (`x.body`,
+`github.pr.title`, `x.range`), never in new core types. Elements form a tree
+(`children`, one parent each, reachable from `root`); `relations` carry the
+rest (`authoredBy`, `quotes`, `mergesInto`, `reviews`, `attachedTo`, …).
+`bounds` place an element in a view, in that view's layout units, quantized
+to 1/64. `visible: false` marks things in the data but not in the view (a URL
+replaced by its card, the 13th file of a PR). Adapters choose element ids that
+are stable across captures (`action.like`, `file:docs/CI.md`), which is what
+makes `compare` meaningful.
+
+### State
+
+`state.asOf` equals `provenance.capture.capturedAt`; `state.temporal` is
+always `historical-observation`. Each fact has a subject, key, value, basis,
+optional `sourceTime`, and `volatile` (may have changed since). The format has
+no way to say "current", on purpose.
+
+### Capabilities — descriptions, never grants
+
+`capabilityPolicy` is always `descriptive-only`. Each capability names its
+kind (`navigate`, `projection`, `mutation`, `communication`), target element,
+input JSON Schema, effects, required authority and who checks it,
+preconditions, executor (`local`, `origin`, `user-agent`), verification
+method, and availability. Verification rejects:
+
+- a mutation or communication that is local-executable or has a local executor;
+- a mutation or communication that names no authority, or `checkedBy: none`;
+- anything local-executable that is not a local projection.
+
+The only things that run from an artifact alone are **local projections**:
+re-rendering the same preserved input differently (`expand`, `retheme`). The
+result is a new artifact whose `provenance.derivedFrom` names its parent.
+`xeet artifact project post like` refuses. The GitHub `merge` capability pins
+`sha` to the observed head commit, so the origin refuses it if the PR moved
+after the observation.
+
+### Verification (consumer side)
+
+`verify::verify` runs named checks — `format schema identity assets views
+semantic basis state capabilities provenance coverage reproduction` — with no
+network, clock, renderer or model, except reproduction, which takes an optional
+`Reproducer` that re-derives each view from the preserved inputs and compares
+hashes. That is the link between the visual and semantic representations: both
+are outputs of declared deterministic steps over the same input bytes, and a
+third party can re-run them. Every report also lists what verification
+**cannot** establish: source authenticity, current truth, executability.
+
+### Compatibility
+
+Readers ignore unknown fields; identity covers them (it hashes the text as
+written). Minor version = additive. A major bump changes the `format` check.
+`docs/artifacts/*` are the compatibility fixtures, verified in CI by
+`committed_examples_stay_readable_and_reproducible`.
+
+---
+
+## 3. Architecture
+
+```
+          source bytes + capture time (caller-supplied; adapters never fetch)
+                 │
+   ┌─────────────┴──────────────┐
+   │ xeet-capture (adapters)    │   x.rs       → xeet-core X renderer (unchanged)
+   │                            │   github.rs  → view.rs (generic document renderer)
+   └─────────────┬──────────────┘
+                 │ Package (artifact.json + assets/)
+   ┌─────────────┴──────────────┐
+   │ xeet-artifact (universal)  │   model · canon · verify · compare · inspect
+   │ deps: serde, serde_json,   │   knows no source and no renderer
+   │       sha2                 │
+   └─────────────┬──────────────┘
+                 │
+   CLI `xeet artifact …` · MCP `xeet artifact mcp` · Rust library
+```
+
+| layer | lines | source-specific? |
+|---|---:|---|
+| `xeet-artifact` (format, canonical identity, package I/O, verify, compare, inspect) | 1,670 | no |
+| `xeet-capture/view.rs` (generic block-document renderer) | 270 | no |
+| `xeet-capture/lib.rs` (shared helpers, reproducer dispatch) | 109 | no |
+| `xeet-capture/x.rs` | 627 | X |
+| `xeet-capture/github.rs` | 663 | GitHub |
+| CLI + MCP (`commands/artifact.rs`) | 403 | no |
+| `xeet-core` change | 14 | — |
+
+**Adding a source** = one adapter module that maps source bytes to elements,
+facts, capabilities and either view blocks (generic renderer) or its own
+renderer, plus a `Reproducer` arm. The GitHub adapter was added without any
+change to `xeet-artifact`; the core's checks apply to it unchanged
+(`both_sources_share_one_contract`).
+
+---
+
+## 4. Evidence
+
+Tests (`crates/xeet-capture/tests/artifacts.rs`, `crates/xeet-cli/tests/artifact_cli.rs`,
+`crates/xeet-artifact/src/canon.rs`):
+
+- every X fixture × 2 themes: capture → disk → read → verify with reproduction;
+- the X view equals `xeet render`'s bytes; body bounds equal the frame's `text` box;
+- capture is deterministic (same inputs → same id), for both sources;
+- the PR artifact passes the same verifier; painted elements have bounds,
+  in-sentence tokens do not; `reviewDecision` is `derived`, null `mergeable`
+  is `unknown`; `merge` is delegated, authority-bearing, head-pinned;
+- tampering is caught: a flipped pixel byte (assets), an edited word (identity),
+  a swapped source input that is re-sealed consistently (reproduction);
+- an artifact that marks `merge` local-executable fails; undeclared inference fails;
+- `expand` produces a verified derived artifact; `like` is refused;
+- `compare` reports state changes (open → merged) and removed capabilities, and
+  a re-theme as different pixels with **no** semantic change;
+- CLI round trip and exit codes; MCP initialize / tools/list / tools/call / errors;
+- committed examples stay readable and reproducible.
+
+Measurements (CLI wall time, optimized `fast` profile, n=20, includes ~3 ms
+process start, this container):
+
+| operation | p50 |
+|---|---:|
+| `xeet render` (existing; pizzahut, 390 px @3×) | 26.8 ms |
+| `artifact capture x` (same post) | 28.2 ms |
+| `artifact capture github` (fixture, 600 px @2×) | 44.8 ms |
+| `artifact verify` x, with reproduction | 27.5 ms |
+| `artifact verify` x, integrity only | 4.2 ms |
+| `artifact inspect` | 3.6 ms |
+
+Sizes: the X artifact document is 17.6 KB beside a 281 KB view; the PR
+document 27.4 KB beside a 561 KB view (@2×). The structured representation is
+~3–6 % of the package; the pixels dominate.
+
+Semantic coverage of the two examples: X post — 16 elements, 14 with bounds,
+14 facts (8 source, 4 derived, 2 unknown), entity bounds absent (declared).
+PR — 27 elements, 23 with bounds, 9 facts, 7 capabilities (4 need GitHub
+authority).
+
+---
+
+## 5. What is not done, and known limits
+
+- **The GitHub fixture is constructed**, in REST API shape; it is not a recorded
+  response (it says so in `_fixture`). This session had no API access to a
+  repository with pull requests. Capturing a real PR is one `curl` per endpoint
+  into a bundle; nothing in the adapter changes.
+- **Live X resolution was not exercised** here: this environment's TLS proxy is
+  not in `xeet-resolve-net`'s root store. The `xeet resolve` → capture path was
+  tested offline (`--no-links`).
+- **No WASM/JS surface yet.** The artifact crates are pure Rust with no I/O in
+  the core and should compile to WASM, but `packages/xeet` does not expose them.
+- **Entity bounds** (X) and token bounds inside a sentence (GitHub summary) are
+  not computed; both are declared as omitted.
+- **The GitHub view is generic**: markdown is shown as text; github.com's UI is
+  not replicated (`fidelity.claim: generic`). Inline review threads, checks and
+  statuses are not read.
+- **Authenticity is always `unverified`.** Nothing signs source data or artifacts.
+- The package is a directory; there is no single-file transport yet.
+- Reproduction depends on the renderer version: an artifact made by an older
+  ruleset reproduces only with that ruleset. Integrity checks do not.
+
+## 6. One decision worth recording
+
+Identity first failed a disk round trip: `serde_json`'s default float parser is
+one ulp off on some 17-digit values. Turning on `serde_json/float_roundtrip`
+fixed it but was rejected: Cargo unifies features across the workspace, so the
+native build would parse floats differently from the WASM build — a quiet
+threat to xeet's native/WASM byte identity. Instead, identity is computed from
+number tokens as written, and geometry is quantized to 1/64 px (Blink's
+LayoutUnit, and the parity gate's tolerance).
+
+## 7. Integration boundaries (no dependencies in the core)
+
+- **Capability host (AppPort-style):** the CLI subcommands and MCP tools are
+  the operations — capture, verify, compare, inspect, capabilities, project —
+  with JSON in and out and explicit authority fields. A host exposes them; it
+  does not need to link this code.
+- **Durable store (FeltDB-style):** the package is already content-addressed
+  (`id`, asset hashes), versioned (`formatVersion`), linked (`derivedFrom`),
+  and temporal (`capturedAt`, `state.asOf`). A store keys artifacts by `id`,
+  assets by hash, and history by `subject.reference` + `capturedAt`.
+- **Controlled execution (AppBoundry-style):** adapters and renderers are pure
+  functions of (bytes, time, options); they need no network and no filesystem
+  beyond what the host hands them.
+- **Retrieval/assistant (AnywhereAide-style):** the semantic graph, facts and
+  `compare` give an agent structure to search and reason over; the views give
+  people the evidence. Neither needs a model to be read or checked.
+
+## 8. Next highest-value step
+
+Capture **real** observations over time: a small fetcher (outside the core,
+like `xeet-resolve-net`) that turns a PR URL into a REST bundle with the
+caller's token, then re-capture the same PR and X post periodically and use
+`compare` as a change log. That turns the format from "proven on fixtures" into
+"proven on reality", and exercises the parts fixtures cannot: volatile state,
+authority-pinned capabilities (`merge` with `sha`), and long-lived reproduction.

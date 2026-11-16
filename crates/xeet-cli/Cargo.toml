@@ -24,6 +24,10 @@ serde_json = "1"
 xeet-resolve = { path = "../xeet-resolve" }
 xeet-resolve-net = { path = "../xeet-resolve-net" }
 
+# `xeet artifact`: the universal artifact format and its source adapters.
+xeet-artifact = { path = "../xeet-artifact" }
+xeet-capture = { path = "../xeet-capture" }
+
 # Dedicated render/explain/sheet/serve binary (`xeet-render serve --stdio`
 # speaks the JSON render protocol, while `xeet serve --stdio` serves text
 # layout queries for the oracle suite).
