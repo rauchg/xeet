@@ -16,16 +16,22 @@
 //!   optional [`Reproducer`] hook that re-derives views from preserved inputs.
 //! - [`compare`] — what differs between two observations.
 //! - [`inspect`] — a human-readable account.
+//! - [`project`] — deterministic projections for text-only and vision
+//!   consumers, with focus, depth and character budgets.
+//! - [`annotate`] — the only way model-read content enters an artifact: as
+//!   declared inference, in a new derived artifact.
 //!
 //! Source adapters (in other crates) produce artifacts; this crate consumes
 //! and checks them, which is what keeps adapters from having to touch it.
 
 #![forbid(unsafe_code)]
 
+pub mod annotate;
 pub mod canon;
 pub mod compare;
 pub mod inspect;
 pub mod model;
+pub mod project;
 pub mod verify;
 
 pub use model::*;

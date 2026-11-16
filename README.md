@@ -75,7 +75,9 @@ semantic graph with bounds for machines, provenance, state as of capture,
 capabilities with explicit authority, and the producer's own limitations, all
 content-addressed and verifiable offline (including byte-for-byte
 reproduction of the view). The image is one projection of the artifact, not
-the artifact. See [`docs/ARTIFACT.md`](docs/ARTIFACT.md).
+the artifact: `xeet artifact project` gives a text-only model the same
+information — elements, positions, layout rows, state, capabilities — with
+anything that exists only as pixels named, never guessed. See [`docs/ARTIFACT.md`](docs/ARTIFACT.md).
 
 ## Running it
 

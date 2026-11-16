@@ -155,6 +155,9 @@ pub struct Transformation {
     pub outputs: Vec<String>,
     /// True when re-running the step on the same inputs gives the same bytes.
     pub deterministic: bool,
+    /// When the step ran, for steps after the observation (an annotation).
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub at: Option<String>,
 }
 
 #[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]

@@ -104,6 +104,7 @@ pub fn capture(c: &Capture) -> Result<Package, String> {
                 inputs: vec![asset.clone()],
                 outputs: vec![input.clone()],
                 deterministic: true,
+                at: None,
             });
         }
         inputs.push(AssetUse {
@@ -608,6 +609,7 @@ pub fn capture(c: &Capture) -> Result<Package, String> {
                         inputs: vec![input.clone()],
                         outputs: vec!["model::Post".into()],
                         deterministic: true,
+                        at: None,
                     },
                     Transformation {
                         step: "decide-and-layout".into(),
@@ -615,6 +617,7 @@ pub fn capture(c: &Capture) -> Result<Package, String> {
                         inputs: vec!["model::Post".into(), "views.v0.config".into()],
                         outputs: vec!["report".into(), "geometry".into()],
                         deterministic: true,
+                        at: None,
                     },
                     Transformation {
                         step: "rasterize".into(),
@@ -622,6 +625,7 @@ pub fn capture(c: &Capture) -> Result<Package, String> {
                         inputs: vec!["display-list".into()],
                         outputs: vec![view_asset.clone()],
                         deterministic: true,
+                        at: None,
                     },
                     Transformation {
                         step: "map-semantics".into(),
@@ -629,6 +633,7 @@ pub fn capture(c: &Capture) -> Result<Package, String> {
                         inputs: vec!["report".into(), "geometry".into()],
                         outputs: vec!["semantic".into(), "state".into(), "capabilities".into()],
                         deterministic: true,
+                        at: None,
                     },
                 ])
                 .collect(),
@@ -681,7 +686,7 @@ pub fn capture(c: &Capture) -> Result<Package, String> {
 /// Runs a local projection capability: a new artifact of the same observation
 /// with different view options, linked to its parent. The source is never
 /// contacted; the parent's preserved input is the only input.
-pub fn project(
+pub fn invoke(
     parent: &Artifact,
     package: &Package,
     capability: &str,
@@ -749,6 +754,7 @@ pub fn project(
             inputs: vec![parent.id.clone(), input.to_string()],
             outputs: vec!["views.v0.config".into()],
             deterministic: true,
+            at: None,
         },
     );
     let mut store = AssetStore::default();

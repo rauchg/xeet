@@ -849,6 +849,7 @@ pub fn capture(c: &Capture) -> Result<Package, String> {
                         "view-blocks".into(),
                     ],
                     deterministic: true,
+                    at: None,
                 },
                 Transformation {
                     step: "layout-and-rasterize".into(),
@@ -856,6 +857,7 @@ pub fn capture(c: &Capture) -> Result<Package, String> {
                     inputs: vec!["view-blocks".into(), "views.v0.config".into()],
                     outputs: vec![png_asset.clone(), "bounds".into()],
                     deterministic: true,
+                    at: None,
                 },
             ],
             authenticity: Authenticity::Unverified,

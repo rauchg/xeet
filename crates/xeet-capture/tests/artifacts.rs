@@ -320,14 +320,14 @@ fn local_projections_run_and_remote_actions_are_refused() {
         "a long post offers expand"
     );
 
-    let child = x::project(&a, &p, "expand", &json!({})).unwrap();
+    let child = x::invoke(&a, &p, "expand", &json!({})).unwrap();
     assert_verifies(&child, "expanded");
     let c = child.artifact().unwrap();
     assert_eq!(c.provenance.derived_from.as_deref(), Some(a.id.as_str()));
     assert!(c.views[0].layout_height > a.views[0].layout_height);
     assert!(!c.capabilities.iter().any(|c| c.id == "expand"));
 
-    let err = x::project(&a, &p, "like", &json!({})).unwrap_err();
+    let err = x::invoke(&a, &p, "like", &json!({})).unwrap_err();
     assert!(err.contains("authority"), "{err}");
 }
 

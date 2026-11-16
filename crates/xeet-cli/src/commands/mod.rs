@@ -254,6 +254,7 @@ pub const BOOLEAN_FLAGS: &[&str] = &[
     "expanded",
     "json",
     "no-reproduce",
+    "compact-capabilities",
 ];
 
 /// A tiny, forgiving argument parser: positional arguments plus `--flags` and

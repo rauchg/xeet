@@ -10,7 +10,7 @@ use super::*;
 use serde_json::Value;
 use std::io::BufRead;
 use std::path::Path;
-use xeet_artifact::{compare, inspect, verify, Artifact, Package};
+use xeet_artifact::{annotate, compare, inspect, project, verify, Artifact, Package};
 use xeet_capture::{github, x, Reproducers};
 
 pub const USAGE: &str = "\
@@ -24,9 +24,17 @@ artifact verify DIR [--no-reproduce] [--json]
                                         reproduction of views from preserved inputs
 artifact compare A B [--json]           what differs between two observations
 artifact capabilities DIR [--json]      what could be done, and with whose authority
-artifact project DIR CAPABILITY [--input JSON] -o OUT
-                                        run a local projection (expand, retheme);
+artifact project DIR [--consumer text|vision] [--format text|json] [--focus ID]
+         [--depth N] [--sections elements,layout,relations,state,capabilities,
+         limitations,consumers] [--max-text N] [--max-chars N] [--compact-capabilities]
+                                        a deterministic projection for a text-only or
+                                        vision consumer; no image needed to read it
+artifact invoke DIR CAPABILITY [--input JSON] -o OUT
+                                        run a local capability (expand, retheme);
                                         refuses anything that needs outside authority
+artifact annotate DIR ANNOTATION.json -o OUT
+                                        add model-read content as declared inference,
+                                        in a new artifact derived from DIR
 artifact mcp                            MCP server on stdio (JSON-RPC, one message
                                         per line): read-only artifact tools";
 
@@ -46,6 +54,14 @@ const KNOWN: &[&str] = &[
     "json",
     "no-reproduce",
     "input",
+    "consumer",
+    "format",
+    "focus",
+    "depth",
+    "sections",
+    "max-text",
+    "max-chars",
+    "compact-capabilities",
     "help",
     "h",
 ];
@@ -104,7 +120,9 @@ pub fn run(argv: &[String]) -> u8 {
             }
             EXIT_OK
         }),
-        ["project", dir, cap] => project(&args, dir, cap),
+        ["invoke", dir, cap] => invoke(&args, dir, cap),
+        ["project", dir] => project_cmd(&args, dir),
+        ["annotate", dir, file] => annotate_cmd(&args, dir, file),
         ["mcp"] => mcp(),
         _ => return usage_error("unknown artifact subcommand"),
     };
@@ -306,7 +324,7 @@ fn verify_cmd(args: &Args, dir: &str) -> Result<u8, String> {
     Ok(if v.ok { EXIT_OK } else { EXIT_INPUT })
 }
 
-fn project(args: &Args, dir: &str, cap: &str) -> Result<u8, String> {
+fn invoke(args: &Args, dir: &str, cap: &str) -> Result<u8, String> {
     let out = out_dir(args)?;
     let (p, a) = read(dir)?;
     let input: Value = match args.value("input") {
@@ -319,7 +337,58 @@ fn project(args: &Args, dir: &str, cap: &str) -> Result<u8, String> {
             a.provenance.adapter.name
         ));
     }
-    let child = x::project(&a, &p, cap, &input)?;
+    let child = x::invoke(&a, &p, cap, &input)?;
+    write(&child, out)
+}
+
+/// Builds a projection request from flags (CLI) or arguments (MCP).
+pub fn projection_request(
+    get: impl Fn(&str) -> Option<String>,
+) -> Result<(project::Request, project::Form), String> {
+    fn parse<T: serde::de::DeserializeOwned>(k: &str, v: String) -> Result<T, String> {
+        serde_json::from_value(Value::String(v.clone()))
+            .map_err(|_| format!("--{k}: unknown value `{v}`"))
+    }
+    let num = |k: &str| -> Result<Option<usize>, String> {
+        get(k)
+            .map(|v| v.parse().map_err(|_| format!("--{k} needs a whole number")))
+            .transpose()
+    };
+    let mut req = project::Request::default();
+    if let Some(c) = get("consumer") {
+        req.consumer = parse("consumer", c)?;
+    }
+    if let Some(list) = get("sections") {
+        for s in list.split(',').filter(|s| !s.is_empty()) {
+            req.sections.push(parse("sections", s.trim().to_string())?);
+        }
+    }
+    req.focus = get("focus");
+    req.depth = num("depth")?;
+    req.max_text = num("max-text")?;
+    req.max_chars = num("max-chars")?;
+    req.compact_capabilities = get("compact-capabilities").is_some_and(|v| v != "false");
+    let form = match get("format").as_deref() {
+        None | Some("text") => project::Form::Text,
+        Some("json") => project::Form::Json,
+        Some(other) => return Err(format!("--format: unknown value `{other}`")),
+    };
+    Ok((req, form))
+}
+
+fn project_cmd(args: &Args, dir: &str) -> Result<u8, String> {
+    let (_, a) = read(dir)?;
+    let (req, form) = projection_request(|k| args.value(k).map(str::to_string))?;
+    print!("{}", project::render(&a, &req, form)?);
+    Ok(EXIT_OK)
+}
+
+fn annotate_cmd(args: &Args, dir: &str, file: &str) -> Result<u8, String> {
+    let out = out_dir(args)?;
+    let p = Package::read_dir(Path::new(dir))?;
+    let ann: annotate::Annotation =
+        serde_json::from_slice(&read_bytes(file)?).map_err(|e| format!("{file}: {e}"))?;
+    let child = annotate::annotate(&p, &ann)?;
     write(&child, out)
 }
 
@@ -376,6 +445,19 @@ fn mcp_tools() -> Value {
          "description": "What could be done with the observed object, with input schemas, executors, required authority and verification methods. Descriptions only: this server executes none of them.",
          "inputSchema": {"type": "object", "required": ["path"], "additionalProperties": false, "properties": {"path": path}},
          "annotations": {"readOnlyHint": true, "openWorldHint": false}},
+        {"name": "artifact_project", "title": "Project an artifact for a consumer",
+         "description": "A deterministic projection of the artifact for a text-only or vision-capable consumer: every element's meaning as text with hierarchy, bounds and layout rows, plus state, provenance, capabilities, limitations, and what exists only as pixels. With consumer=vision the view image is attached; anything read from it is inference. Supports a focus element, depth, per-string and total character budgets; omissions are listed.",
+         "inputSchema": {"type": "object", "required": ["path"], "additionalProperties": false, "properties": {
+            "path": path,
+            "consumer": {"enum": ["text", "vision"], "default": "text"},
+            "format": {"enum": ["text", "json"], "default": "text"},
+            "focus": {"type": "string", "description": "element id; its ancestors are kept as context"},
+            "depth": {"type": "integer", "minimum": 0},
+            "sections": {"type": "array", "items": {"enum": ["elements", "layout", "relations", "state", "capabilities", "limitations", "consumers"]}},
+            "maxText": {"type": "integer", "minimum": 1},
+            "maxChars": {"type": "integer", "minimum": 1},
+            "compactCapabilities": {"type": "boolean", "default": false}}},
+         "annotations": {"readOnlyHint": true, "openWorldHint": false}},
         {"name": "artifact_view", "title": "Show a view",
          "description": "Returns one visual projection (PNG) of the artifact as an image, with its view metadata.",
          "inputSchema": {"type": "object", "required": ["path"], "additionalProperties": false, "properties": {"path": path, "view": {"type": "string", "default": "v0"}}},
@@ -415,6 +497,41 @@ fn mcp_call(name: &str, a: &Value) -> Result<Value, String> {
                 &serde_json::json!({"capabilityPolicy": x.capability_policy, "capabilities": x.capabilities}),
             ))
         }
+        "artifact_project" => {
+            let (_, x) = read(arg("path")?)?;
+            let get = |k: &str| -> Option<String> {
+                let key = match k {
+                    "max-text" => "maxText",
+                    "max-chars" => "maxChars",
+                    "compact-capabilities" => "compactCapabilities",
+                    other => other,
+                };
+                match a.get(key)? {
+                    Value::String(s) => Some(s.clone()),
+                    Value::Number(n) => Some(n.to_string()),
+                    Value::Bool(b) => Some(b.to_string()),
+                    Value::Array(items) => Some(
+                        items
+                            .iter()
+                            .filter_map(Value::as_str)
+                            .collect::<Vec<_>>()
+                            .join(","),
+                    ),
+                    _ => None,
+                }
+            };
+            let (req, form) = projection_request(get)?;
+            let body = project::render(&x, &req, form)?;
+            let mut content = Vec::new();
+            if req.consumer == project::Consumer::Vision {
+                for v in &x.views {
+                    let bytes = p_bytes(&x, arg("path")?, &v.asset)?;
+                    content.push(serde_json::json!({"type": "image", "mimeType": v.media_type, "data": xeet_resolve::b64(&bytes)}));
+                }
+            }
+            content.push(serde_json::json!({"type": "text", "text": body}));
+            Ok(serde_json::json!({"content": content}))
+        }
         "artifact_view" => {
             let (p, x) = read(arg("path")?)?;
             let id = a.get("view").and_then(Value::as_str).unwrap_or("v0");
@@ -432,6 +549,13 @@ fn mcp_call(name: &str, a: &Value) -> Result<Value, String> {
         }
         other => Err(format!("unknown tool {other}")),
     }
+}
+
+fn p_bytes(_a: &Artifact, dir: &str, sha: &str) -> Result<Vec<u8>, String> {
+    let p = Package::read_dir(Path::new(dir))?;
+    p.asset_bytes(sha)
+        .map(<[u8]>::to_vec)
+        .ok_or_else(|| format!("asset {sha} missing"))
 }
 
 fn mcp() -> Result<u8, String> {
