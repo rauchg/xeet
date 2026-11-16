@@ -33,6 +33,7 @@ thread_local! {
 /// the direction, the resolved script and the user features.
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 struct PlanKey {
+    generation: u32,
     face: u16,
     rtl: bool,
     script: Option<harfrust::Script>,
@@ -142,6 +143,7 @@ fn plan_for(
     tnum: bool,
 ) -> Rc<ShapePlan> {
     let key = PlanKey {
+        generation: crate::fonts::generation(),
         face: face.id,
         rtl,
         script,

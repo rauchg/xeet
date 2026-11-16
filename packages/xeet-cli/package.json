@@ -1,6 +1,6 @@
 {
   "name": "@xeet/cli",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "commonjs",
   "description": "Render X posts to PNG from the command line. No browser, no system fonts required.",
   "license": "Apache-2.0",
@@ -27,11 +27,11 @@
     "node": ">=18"
   },
   "optionalDependencies": {
-    "@xeet/cli-darwin-arm64": "0.1.0",
-    "@xeet/cli-darwin-x64": "0.1.0",
-    "@xeet/cli-linux-arm64": "0.1.0",
-    "@xeet/cli-linux-x64": "0.1.0",
-    "@xeet/cli-win32-arm64": "0.1.0",
-    "@xeet/cli-win32-x64": "0.1.0"
+    "@xeet/cli-darwin-arm64": "0.1.1",
+    "@xeet/cli-darwin-x64": "0.1.1",
+    "@xeet/cli-linux-arm64": "0.1.1",
+    "@xeet/cli-linux-x64": "0.1.1",
+    "@xeet/cli-win32-arm64": "0.1.1",
+    "@xeet/cli-win32-x64": "0.1.1"
   }
 }

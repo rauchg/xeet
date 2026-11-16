@@ -437,6 +437,46 @@
       "url": "system:///System/Library/Fonts/ヒラギノ角ゴシック W6.ttc#face=0",
       "sha256": "e2fd35d5847bbea8f48a946aa78ecd1a5683e9f4eba19fdfdb1058361d422323",
       "unicodeRange": "U+0-10FFFF"
+    },
+    {
+      "kind": "fallback",
+      "family": "Noto Sans SC",
+      "weight": 400,
+      "subset": "cjk",
+      "file": "NotoSansSC-Regular.otf",
+      "url": "https://github.com/googlefonts/noto-cjk/raw/main/Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Regular.otf#delta=hiragino",
+      "sha256": "4b44f4ec86744092f71365f845d3865b59812a71bd5cd7919d56586279e5ca04",
+      "unicodeRange": "U+2E80-33FF,U+3400-4DBF,U+4E00-9FFF,U+F900-FAFF,U+FE30-FE4F,U+FF00-FFEF,U+20000-2FA1F"
+    },
+    {
+      "kind": "fallback",
+      "family": "Noto Sans SC",
+      "weight": 700,
+      "subset": "cjk",
+      "file": "NotoSansSC-Bold.otf",
+      "url": "https://github.com/googlefonts/noto-cjk/raw/main/Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Bold.otf#delta=hiragino",
+      "sha256": "9450e94d3c196f48c5b2599dde4d2ab1ee67a191c0b3c5869501ada7cc6aeed1",
+      "unicodeRange": "U+2E80-33FF,U+3400-4DBF,U+4E00-9FFF,U+F900-FAFF,U+FE30-FE4F,U+FF00-FFEF,U+20000-2FA1F"
+    },
+    {
+      "kind": "fallback",
+      "family": "Noto Sans KR",
+      "weight": 400,
+      "subset": "hangul",
+      "file": "NotoSansKR-Regular.otf",
+      "url": "https://github.com/googlefonts/noto-cjk/raw/main/Sans/OTF/Korean/NotoSansCJKkr-Regular.otf#subset=hangul",
+      "sha256": "8c78b891538217e1d5cce826d1943dc760dac474d30416a9ee8d1c45230ec1d9",
+      "unicodeRange": "U+1100-11FF,U+3130-318F,U+3200-321E,U+3260-327F,U+A960-A97F,U+AC00-D7FF,U+FFA0-FFDC"
+    },
+    {
+      "kind": "fallback",
+      "family": "Noto Sans KR",
+      "weight": 700,
+      "subset": "hangul",
+      "file": "NotoSansKR-Bold.otf",
+      "url": "https://github.com/googlefonts/noto-cjk/raw/main/Sans/OTF/Korean/NotoSansCJKkr-Bold.otf#subset=hangul",
+      "sha256": "23cb623d92a390ad44c20fcc52419c6d8b21ef494a4a618c4c16178a12c8d053",
+      "unicodeRange": "U+1100-11FF,U+3130-318F,U+3200-321E,U+3260-327F,U+A960-A97F,U+AC00-D7FF,U+FFA0-FFDC"
     }
   ],
   "icons": {

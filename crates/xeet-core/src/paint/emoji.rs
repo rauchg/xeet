@@ -410,9 +410,9 @@ fn rasterize_colrv0(
 ) -> Option<Sprite> {
     let size_dev = size_css * dpr;
     let font = fonts::font(face.id)?;
-    let color_glyph = ColorGlyphCollection::new(font)
+    let color_glyph = ColorGlyphCollection::new(&font)
         .get_with_format(GlyphId::new(glyph), ColorGlyphFormat::ColrV0)?;
-    let palettes = ColorPalettes::new(font);
+    let palettes = ColorPalettes::new(&font);
     let palette = palettes.get(0);
     let mut painter = LayerPainter {
         face,
@@ -509,7 +509,7 @@ impl LayerPainter<'_> {
 
     fn glyph_path(&self, glyph: GlyphId) -> Option<tiny_skia::Path> {
         let font = fonts::font(self.face.id)?;
-        let g = OutlineGlyphCollection::new(font).get(glyph)?;
+        let g = OutlineGlyphCollection::new(&font).get(glyph)?;
         let mut pen = crate::paint::glyph::Pen::new(1.0);
         g.draw(
             skrifa::outline::DrawSettings::unhinted(

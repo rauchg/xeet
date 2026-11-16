@@ -182,7 +182,7 @@ jobs:
             console.log("version: " + ver);
             const pngPath = dir + "/smoke.png";
             const post = JSON.stringify({
-              text: "release smoke 🚀 日本語 𝗯𝗼𝗹𝗱 שלום مرحبا",
+              text: "release smoke 🚀 日本語 正式上线 한글 𝗯𝗼𝗹𝗱 שלום مرحبا",
               createdAt: "2026-11-15T00:00:00Z",
               now: "2026-11-15T01:00:00Z",
             });
@@ -254,7 +254,7 @@ jobs:
           const xeet = await loadXeet();
           const { png } = xeet.render(
             {
-              text: "release smoke 🚀 日本語 𝗯𝗼𝗹𝗱 שלום مرحبا",
+              text: "release smoke 🚀 日本語 正式上线 한글 𝗯𝗼𝗹𝗱 שלום مرحبا",
               createdAt: "2026-11-15T00:00:00Z",
               now: "2026-11-15T01:00:00Z",
             },

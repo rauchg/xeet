@@ -157,6 +157,22 @@ export const OPEN_FONTS = [
     url: "system:///System/Library/Fonts/ヒラギノ角ゴシック W3.ttc#face=0" },
   { kind: "fallback", family: "Hiragino Sans", weight: 700, subset: "cjk", file: "HiraginoSans-Bold.otf",
     url: "system:///System/Library/Fonts/ヒラギノ角ゴシック W6.ttc#face=0" },
+  // Noto Sans CJK SC & KR (SIL OFL 1.1): delta-subsetted to the Simplified /
+  // Traditional Chinese + Extension A ideographs Hiragino lacks, plus Korean
+  // Hangul in its own lazy pack (`hangul`). Placing SC after Hiragino preserves
+  // 100% of Chrome-macOS Japanese/kaomoji parity while covering GB18030/BMP/Ext-A.
+  { kind: "fallback", family: "Noto Sans SC", weight: 400, subset: "cjk", file: "NotoSansSC-Regular.otf",
+    url: "https://github.com/googlefonts/noto-cjk/raw/main/Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Regular.otf#delta=hiragino",
+    unicodeRange: "U+2E80-33FF,U+3400-4DBF,U+4E00-9FFF,U+F900-FAFF,U+FE30-FE4F,U+FF00-FFEF,U+20000-2FA1F" },
+  { kind: "fallback", family: "Noto Sans SC", weight: 700, subset: "cjk", file: "NotoSansSC-Bold.otf",
+    url: "https://github.com/googlefonts/noto-cjk/raw/main/Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Bold.otf#delta=hiragino",
+    unicodeRange: "U+2E80-33FF,U+3400-4DBF,U+4E00-9FFF,U+F900-FAFF,U+FE30-FE4F,U+FF00-FFEF,U+20000-2FA1F" },
+  { kind: "fallback", family: "Noto Sans KR", weight: 400, subset: "hangul", file: "NotoSansKR-Regular.otf",
+    url: "https://github.com/googlefonts/noto-cjk/raw/main/Sans/OTF/Korean/NotoSansCJKkr-Regular.otf#subset=hangul",
+    unicodeRange: "U+1100-11FF,U+3130-318F,U+3200-321E,U+3260-327F,U+A960-A97F,U+AC00-D7FF,U+FFA0-FFDC" },
+  { kind: "fallback", family: "Noto Sans KR", weight: 700, subset: "hangul", file: "NotoSansKR-Bold.otf",
+    url: "https://github.com/googlefonts/noto-cjk/raw/main/Sans/OTF/Korean/NotoSansCJKkr-Bold.otf#subset=hangul",
+    unicodeRange: "U+1100-11FF,U+3130-318F,U+3200-321E,U+3260-327F,U+A960-A97F,U+AC00-D7FF,U+FFA0-FFDC" },
 ];
 
 /** X's default profile image: what x.com draws for an account with no avatar. */
@@ -474,6 +490,13 @@ async function main() {
         data = await readFile(vendored);
       } else {
         throw new Error(`missing ${rawSysPath} and ${vendored}; extract on macOS or restore assets/vendor/`);
+      }
+    } else if (open.url.includes("#delta=") || open.url.includes("#subset=")) {
+      const vendored = join(VENDOR, "fonts", open.file);
+      if (existsSync(vendored)) {
+        data = await readFile(vendored);
+      } else {
+        throw new Error(`missing pre-subsetted ${vendored}; rebuild with hb-subset`);
       }
     } else {
       data = await get(open.url);

@@ -17,6 +17,7 @@ use super::coverage;
 use crate::paint::fonts;
 use skrifa::instance::{LocationRef, Size};
 use skrifa::outline::{DrawSettings, OutlinePen};
+use skrifa::MetadataProvider as _;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, OnceLock};
 use tiny_skia::PathBuilder;
@@ -40,6 +41,7 @@ impl Bitmap {
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub(crate) struct Key {
+    generation: u32,
     face: u16,
     glyph: u32,
     /// Font size in device pixels × 64.
@@ -100,6 +102,7 @@ pub(crate) fn bitmap(face_id: u16, glyph: u32, size: f32, x: f32, y: f32) -> Opt
     }
     let (x, y) = (quantize(x), quantize(y));
     let key = Key {
+        generation: crate::fonts::generation(),
         face: face_id,
         glyph,
         size: (size * 64.0).round().clamp(1.0, u32::MAX as f32) as u32,
@@ -133,21 +136,65 @@ pub(crate) fn bitmap(face_id: u16, glyph: u32, size: f32, x: f32, y: f32) -> Opt
 }
 
 /// The glyph's outline in device pixels, origin at the pen position.
+///
+/// When `glyph == 0` (`.notdef`) has an empty outline in the font — as in X's
+/// Chirp subsets — synthesizes a visible stroked tofu box inside `.notdef`'s
+/// advance so unsupported scripts never vanish silently.
 pub(crate) fn outline_path(face: &Face, glyph: u32, size: f32) -> Option<tiny_skia::Path> {
     let font = fonts::font(face.id)?;
-    let glyphs = skrifa::outline::OutlineGlyphCollection::new(font);
-    let g = glyphs.get(skrifa::GlyphId::new(glyph))?;
-    // `DrawSettings::unhinted(Size)` already scales font units to pixel
-    // units, so the pen only packs the path.
-    let mut pen = Pen::new(1.0);
-    // FreeType's point order: Chrome rasterizes through FreeType, so the
-    // contour start conventions have to match it, not HarfBuzz's.
-    g.draw(
-        DrawSettings::unhinted(Size::new(size), LocationRef::default()),
-        &mut pen,
-    )
-    .ok()?;
-    pen.finish()
+    let glyphs = skrifa::outline::OutlineGlyphCollection::new(&font);
+    let drawn = glyphs.get(skrifa::GlyphId::new(glyph)).and_then(|g| {
+        // `DrawSettings::unhinted(Size)` already scales font units to pixel
+        // units, so the pen only packs the path.
+        let mut pen = Pen::new(1.0);
+        // FreeType's point order: Chrome rasterizes through FreeType, so the
+        // contour start conventions have to match it, not HarfBuzz's.
+        g.draw(
+            DrawSettings::unhinted(Size::new(size), LocationRef::default()),
+            &mut pen,
+        )
+        .ok()?;
+        pen.finish()
+    });
+    if drawn.is_some() {
+        return drawn;
+    }
+    if glyph == 0 {
+        return synthetic_notdef(&font, size);
+    }
+    None
+}
+
+fn synthetic_notdef(font: &skrifa::FontRef<'_>, size: f32) -> Option<tiny_skia::Path> {
+    let adv = font
+        .glyph_metrics(Size::new(size), LocationRef::default())
+        .advance_width(skrifa::GlyphId::new(0))
+        .unwrap_or(0.55 * size)
+        .max(0.45 * size);
+    let pad_x = (0.09 * adv).max(0.75);
+    let x0 = pad_x;
+    let x1 = (adv - pad_x).max(x0 + 2.0);
+    let y0 = -0.71 * size;
+    let y1 = -0.02 * size;
+    let stroke = (0.065 * size).clamp(1.0, ((x1 - x0).min(y1 - y0) * 0.35).max(1.0));
+
+    let mut pb = PathBuilder::new();
+    // Outer rectangle (CW).
+    pb.move_to(x0, y0);
+    pb.line_to(x1, y0);
+    pb.line_to(x1, y1);
+    pb.line_to(x0, y1);
+    pb.close();
+    // Inner cutout (CCW) so NonZero fill leaves a crisp hollow `.notdef` frame.
+    let (ix0, iy0, ix1, iy1) = (x0 + stroke, y0 + stroke, x1 - stroke, y1 - stroke);
+    if ix1 > ix0 && iy1 > iy0 {
+        pb.move_to(ix0, iy0);
+        pb.line_to(ix0, iy1);
+        pb.line_to(ix1, iy1);
+        pb.line_to(ix1, iy0);
+        pb.close();
+    }
+    pb.finish()
 }
 
 /// Builds a path from font units, scaled by a fixed factor (font size ÷ upem).

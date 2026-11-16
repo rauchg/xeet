@@ -196,3 +196,43 @@ fn help_lists_the_commands() {
         assert!(text.contains(expected), "help is missing {expected}");
     }
 }
+
+#[test]
+fn xeet_font_dir_allows_file_override_and_rejects_bad_dir() {
+    let post = fixture("text-simple.json");
+
+    // Bad XEET_FONT_DIR fails loudly instead of silently rendering with embedded defaults.
+    let bad = Command::new(BIN)
+        .env("XEET_FONT_DIR", "/nonexistent/xeet-font-override-dir")
+        .args(["render", post.to_str().unwrap(), "--dpr", "1"])
+        .output()
+        .expect("spawn");
+    assert_ne!(bad.status.code(), Some(0));
+    assert!(
+        stderr(&bad).contains("XEET_FONT_DIR"),
+        "expected XEET_FONT_DIR error, got: {}",
+        stderr(&bad)
+    );
+
+    // Valid XEET_FONT_DIR with a standalone font file overrides cleanly.
+    let tmp = std::env::temp_dir().join(format!("xeet-font-override-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&tmp);
+    std::fs::create_dir_all(&tmp).unwrap();
+    let src_font = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../assets/vendor/fonts/NotoSansSC-Regular.otf");
+    std::fs::copy(&src_font, tmp.join("NotoSansSC-Regular.otf")).unwrap();
+
+    let ok = Command::new(BIN)
+        .env("XEET_FONT_DIR", &tmp)
+        .args(["render", post.to_str().unwrap(), "--dpr", "1"])
+        .output()
+        .expect("spawn");
+    let _ = std::fs::remove_dir_all(&tmp);
+    assert_eq!(
+        ok.status.code(),
+        Some(0),
+        "valid XEET_FONT_DIR failed: {}",
+        stderr(&ok)
+    );
+    assert_eq!(&ok.stdout[..8], b"\x89PNG\r\n\x1a\n");
+}

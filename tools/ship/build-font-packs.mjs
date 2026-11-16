@@ -38,7 +38,10 @@ function packFor(family) {
     case "Apple Color Emoji":
       return "emoji";
     case "Hiragino Sans":
+    case "Noto Sans SC":
       return "cjk";
+    case "Noto Sans KR":
+      return "hangul";
     case "Noto Sans Arabic":
       return "arabic";
     case "Noto Sans Hebrew":

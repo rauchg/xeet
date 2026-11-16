@@ -53,23 +53,40 @@ pub fn is_command(name: &str) -> bool {
 }
 
 // ---------------------------------------------------------------------------
-// Lazy font packs
+// Lazy font packs & XEET_FONT_DIR overrides
 // ---------------------------------------------------------------------------
 //
-// Native CLI builds embed all faces (`has_lazy_packs() == false`), so every
-// helper below compiles down to a no-op with zero filesystem or serialization
-// overhead. Core-only builds (`XEET_FONT_PACKS=core`) still resolve packs from
-// `XEET_FONT_DIR` or beside the binary.
+// Native CLI builds embed all faces (`has_lazy_packs() == false`), so when
+// `XEET_FONT_DIR` is unset every helper below short-circuits with zero
+// filesystem or serialization overhead. Setting `XEET_FONT_DIR` opts into
+// runtime face overrides (either a `packs.json` bundle or individual
+// `<FaceFile>.ttf`/`.otf` files inside `XEET_FONT_DIR`).
+
+fn apply_env_font_dir_once() -> Result<(), String> {
+    static ENV_OVERRIDE: std::sync::OnceLock<Result<(), String>> = std::sync::OnceLock::new();
+    ENV_OVERRIDE
+        .get_or_init(|| {
+            let Some(raw) = std::env::var_os("XEET_FONT_DIR") else {
+                return Ok(());
+            };
+            if raw.is_empty() {
+                return Ok(());
+            }
+            let dir = PathBuf::from(raw);
+            xeet_core::fonts::load_overrides_from_dir(&dir).map(|_| ())
+        })
+        .clone()
+}
 
 /// The directory that holds `packs.json` and `<pack>.bin`, if this build needs
 /// one. `XEET_FONT_DIR` wins, then a sibling `fonts/` directory, then (in debug
 /// builds only) a `cargo run` from the repo root.
 pub fn pack_dir() -> Option<PathBuf> {
     if let Ok(dir) = std::env::var("XEET_FONT_DIR") {
-        let dir = PathBuf::from(dir);
-        // An explicit override is authoritative: a typo should fail loudly, not
-        // silently fall back to a different pack set.
-        return dir.join("packs.json").exists().then_some(dir);
+        if !dir.is_empty() {
+            let dir = PathBuf::from(dir);
+            return dir.join("packs.json").exists().then_some(dir);
+        }
     }
     if let Ok(exe) = std::env::current_exe() {
         if let Some(bin) = exe.parent() {
@@ -94,9 +111,10 @@ pub fn pack_dir() -> Option<PathBuf> {
     None
 }
 
-/// Registers the packs `value` needs.
+/// Registers the packs `value` needs (and applies `XEET_FONT_DIR` once if set).
 #[inline]
 pub fn ensure_fonts_for_json(value: &serde_json::Value) -> Result<(), String> {
+    apply_env_font_dir_once()?;
     if !xeet_core::fonts::has_lazy_packs() {
         return Ok(());
     }
@@ -108,6 +126,7 @@ pub fn ensure_fonts_for_json(value: &serde_json::Value) -> Result<(), String> {
 /// [`ensure_fonts_for_json`] for a request that is already JSON.
 #[inline]
 pub fn ensure_fonts_for_json_text(json: &str) -> Result<(), String> {
+    apply_env_font_dir_once()?;
     if !xeet_core::fonts::has_lazy_packs() {
         return Ok(());
     }
@@ -128,15 +147,18 @@ pub fn ensure_fonts_for_json_text(json: &str) -> Result<(), String> {
 /// Registers the packs a post and its options need.
 #[inline]
 pub fn ensure_fonts_for_post(post: &Post, options: &RenderOptions) -> Result<(), String> {
+    apply_env_font_dir_once()?;
     if !xeet_core::fonts::has_lazy_packs() {
         return Ok(());
     }
     ensure_fonts_for_json(&serde_json::json!({ "post": post, "options": options }))
 }
 
-/// Loads every pack, for commands that inspect the whole font set.
+/// Loads every pack (and applies `XEET_FONT_DIR` overrides if set), for
+/// commands that inspect the whole font set.
 #[inline]
 pub fn load_all_fonts() -> Result<(), String> {
+    apply_env_font_dir_once()?;
     if !xeet_core::fonts::has_lazy_packs() {
         return Ok(());
     }

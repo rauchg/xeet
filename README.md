@@ -344,7 +344,10 @@ test that keeps it working.
   Two Math rather than the brush-stroke Noto Sans Symbols 2, matching Chrome.
   ([`tools/sync-upstream.mjs`](tools/sync-upstream.mjs), [gallery](#gallery))
 - Kaomoji built from Box Drawing (`┻┳|`, `╯`) and halfwidth katakana (`ﾉ`)
-  fall back to Hiragino Sans.
+  fall back to Hiragino Sans, while Simplified/Traditional Chinese (`线`, `亿`,
+  `视`) and Korean Hangul (`한글`) fall through to SIL OFL Noto Sans SC and KR
+  (with `XEET_FONT_DIR` runtime overrides and visible `.notdef` tofu boxes for
+  unbundled scripts).
   ([`iconic_posts.rs`](crates/xeet-core/tests/iconic_posts.rs),
   [gallery](#gallery))
 

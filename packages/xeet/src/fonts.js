@@ -3,7 +3,7 @@
 // The WebAssembly module embeds only `core` (Chirp + Arial). Every other face
 // lives in a pack built by `tools/ship/build-font-packs.mjs`:
 //
-//   emoji, cjk, math, latin, arabic, hebrew
+//   emoji, cjk, hangul, math, latin, arabic, hebrew
 //
 // `packs.json` is the manifest: each pack has a SHA-256 for the whole blob and
 // for every file inside it. The loader checks the blob before registering any

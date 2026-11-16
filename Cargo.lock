@@ -1128,7 +1128,7 @@ dependencies = [
 
 [[package]]
 name = "xeet-cli"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "serde",
  "serde_json",
@@ -1145,7 +1145,7 @@ dependencies = [
 
 [[package]]
 name = "xeet-core"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "harfrust",
  "icu_properties",
@@ -1200,7 +1200,7 @@ dependencies = [
 
 [[package]]
 name = "xeet-resolve"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "serde",
  "serde_json",
@@ -1210,7 +1210,7 @@ dependencies = [
 
 [[package]]
 name = "xeet-resolve-net"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "serde_json",
  "ureq",
@@ -1219,7 +1219,7 @@ dependencies = [
 
 [[package]]
 name = "xeet-text"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "serde_json",
  "unicode-normalization",
@@ -1228,7 +1228,7 @@ dependencies = [
 
 [[package]]
 name = "xeet-wasm"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "js-sys",
  "serde",

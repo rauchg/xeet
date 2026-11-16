@@ -196,6 +196,11 @@ fn ensure_loaded() {
     GENERATION.fetch_add(1, Ordering::AcqRel);
 }
 
+/// Monotonic counter bumped whenever the font set is (re)loaded.
+pub(crate) fn generation() -> u32 {
+    GENERATION.load(Ordering::Relaxed) as u32
+}
+
 /// Registers one font file from a lazy pack. The host slices the pack blob and
 /// calls this once per file. The next [`db`] call rebuilds the face table.
 ///
@@ -210,30 +215,47 @@ pub fn register_font(file: &str, data: Vec<u8>) -> Result<(), String> {
         // another copy and rebuild for no reason.
         return Ok(());
     }
+    store_runtime_font(spec.file, data)
+}
+
+/// Replaces a face's bytes at runtime, even when `file` is already embedded in
+/// the binary (`core` included). Used by `XEET_FONT_DIR` overrides and hosts
+/// that supply custom font files.
+pub fn override_font(file: &str, data: Vec<u8>) -> Result<(), String> {
+    let Some(spec) = FACES.iter().find(|face| face.file == file) else {
+        return Err(format!("xeet: no font named `{file}` in this build"));
+    };
+    store_runtime_font(spec.file, data)
+}
+
+fn store_runtime_font(static_file: &'static str, data: Vec<u8>) -> Result<(), String> {
     if data.is_empty() {
-        return Err(format!("xeet: `{file}` is empty"));
+        return Err(format!("xeet: `{static_file}` is empty"));
     }
     let leaked: &'static [u8] = Box::leak(data.into_boxed_slice());
     runtime()
         .write()
         .unwrap_or_else(|e| e.into_inner())
-        .insert(spec.file, leaked);
+        .insert(static_file, leaked);
     DIRTY.store(true, Ordering::Release);
     Ok(())
 }
 
-/// The bytes for `file`: embedded in the module, or registered by the host.
+/// The bytes for `file`: host-registered/overridden bytes first, then embedded.
 pub fn face_bytes(file: &str) -> Option<&'static [u8]> {
+    if let Some(&bytes) = runtime()
+        .read()
+        .unwrap_or_else(|e| e.into_inner())
+        .get(file)
+    {
+        return Some(bytes);
+    }
     if let Some(spec) = FACES.iter().find(|face| face.file == file) {
         if !spec.data.is_empty() {
             return Some(spec.data);
         }
     }
-    runtime()
-        .read()
-        .unwrap_or_else(|e| e.into_inner())
-        .get(file)
-        .copied()
+    None
 }
 
 /// True when any face in this build was omitted from the binary and must be
@@ -306,8 +328,13 @@ fn read_pack_manifest(dir: &std::path::Path) -> Result<PackManifest, String> {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-fn install_pack(dir: &std::path::Path, name: &str, pack: &PackEntry) -> Result<(), String> {
-    if pack_loaded(name) {
+fn install_pack_inner(
+    dir: &std::path::Path,
+    name: &str,
+    pack: &PackEntry,
+    allow_override: bool,
+) -> Result<(), String> {
+    if !allow_override && pack_loaded(name) {
         return Ok(());
     }
     let path = dir.join(format!("{name}.bin"));
@@ -344,9 +371,62 @@ fn install_pack(dir: &std::path::Path, name: &str, pack: &PackEntry) -> Result<(
                 file.file
             ));
         }
-        register_font(&file.file, blob[file.offset..end].to_vec())?;
+        let slice = blob[file.offset..end].to_vec();
+        if allow_override {
+            override_font(&file.file, slice)?;
+        } else {
+            register_font(&file.file, slice)?;
+        }
     }
     Ok(())
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn install_pack(dir: &std::path::Path, name: &str, pack: &PackEntry) -> Result<(), String> {
+    install_pack_inner(dir, name, pack, false)
+}
+
+/// Applies explicit font overrides from `dir` (`XEET_FONT_DIR`), replacing
+/// embedded faces when present. Supports both a `packs.json` + `<pack>.bin`
+/// bundle and standalone `<FaceFile>.ttf`/`.otf` files dropped directly into
+/// `dir`.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn load_overrides_from_dir(dir: &std::path::Path) -> Result<usize, String> {
+    if !dir.is_dir() {
+        return Err(format!(
+            "xeet: XEET_FONT_DIR `{}` is not a directory",
+            dir.display()
+        ));
+    }
+    let mut count = 0usize;
+    if dir.join("packs.json").is_file() {
+        let manifest = read_pack_manifest(dir)?;
+        let mut names: Vec<&String> = manifest.packs.keys().collect();
+        names.sort();
+        for name in names {
+            let pack = &manifest.packs[name];
+            if dir.join(format!("{name}.bin")).is_file() {
+                install_pack_inner(dir, name, pack, true)?;
+                count += pack.files.len();
+            }
+        }
+    }
+    for spec in FACES {
+        let candidate = dir.join(spec.file);
+        if candidate.is_file() {
+            let bytes = std::fs::read(&candidate)
+                .map_err(|e| format!("xeet: cannot read {}: {e}", candidate.display()))?;
+            override_font(spec.file, bytes)?;
+            count += 1;
+        }
+    }
+    if count == 0 {
+        return Err(format!(
+            "xeet: XEET_FONT_DIR `{}` contains neither a valid packs.json bundle nor any known font file",
+            dir.display()
+        ));
+    }
+    Ok(count)
 }
 
 /// Registers every pack `json` needs from `dir`. Returns the packs it loaded
@@ -739,20 +819,41 @@ fn packs_for_char(cp: u32, out: &mut Vec<&'static str>) {
         matched = true;
     }
 
-    // CJK and Japanese: kana, ideographs, compatibility forms, box drawing,
-    // and the fullwidth/halfwidth forms that kaomoji and Japanese text use.
+    // Korean Hangul: Jamo, Compatibility Jamo, Enclosed Hangul, Syllables,
+    // and Halfwidth Jamo. Kept in its own lazy pack so Korean posts fetch ~1.8 MB
+    // without pulling the full CJK ideograph pack.
+    if matches!(
+        cp,
+        0x1100..=0x11FF
+            | 0x3130..=0x318F
+            | 0x3200..=0x321E
+            | 0x3260..=0x327F
+            | 0xA960..=0xA97F
+            | 0xAC00..=0xD7FF
+            | 0xFFA0..=0xFFDC
+    ) {
+        add_pack(out, "hangul");
+        matched = true;
+    }
+
+    // CJK and Japanese: kana, Bopomofo, Unified + Extension A..H ideographs,
+    // compatibility forms, box drawing, and the fullwidth/halfwidth forms that
+    // kaomoji, Chinese, and Japanese text use.
     if matches!(
         cp,
         0x2500..=0x259F
             | 0x2E80..=0x2FFF
-            | 0x3000..=0x31FF
-            | 0x3200..=0x33FF
+            | 0x3000..=0x312F
+            | 0x3190..=0x31FF
+            | 0x3220..=0x325F
+            | 0x3280..=0x33FF
             | 0x3400..=0x4DBF
             | 0x4E00..=0x9FFF
             | 0xF900..=0xFAFF
             | 0xFE30..=0xFE4F
-            | 0xFF00..=0xFFEF
-            | 0x20000..=0x2FA1F
+            | 0xFF00..=0xFF9F
+            | 0xFFE0..=0xFFEF
+            | 0x20000..=0x323AF
     ) {
         add_pack(out, "cjk");
         matched = true;
@@ -1090,6 +1191,8 @@ mod tests {
         assert!(packs("hello, world 123").is_empty());
         assert_eq!(packs("ship it 🚀"), vec!["emoji"]);
         assert_eq!(packs("日本語"), vec!["cjk"]);
+        assert_eq!(packs("正式上线"), vec!["cjk"]);
+        assert_eq!(packs("안녕하세요"), vec!["hangul"]);
         assert_eq!(packs("مرحبا"), vec!["arabic"]);
         assert_eq!(packs("שלום"), vec!["hebrew"]);
         assert_eq!(packs("𝗯𝗼𝗹𝗱"), vec!["math"]);
@@ -1097,8 +1200,8 @@ mod tests {
         // "é" is Chirp's own Latin-1 range: no Noto Sans fallback.
         assert!(packs("café").is_empty());
         // A mixed post names every pack once, in scan order.
-        let mixed = packs_for_text("🚀 日本語 𝗯𝗼𝗹𝗱");
-        assert_eq!(mixed, vec!["emoji", "cjk", "math"]);
+        let mixed = packs_for_text("🚀 日本語 한글 𝗯𝗼𝗹𝗱");
+        assert_eq!(mixed, vec!["emoji", "cjk", "hangul", "math"]);
     }
 
     /// And the primary face table agrees with the search it replaced.

@@ -319,7 +319,8 @@ fn pack_for(family: &str) -> &'static str {
     match family {
         "TwitterChirp" | "Arial" => "core",
         "Apple Color Emoji" => "emoji",
-        "Hiragino Sans" => "cjk",
+        "Hiragino Sans" | "Noto Sans SC" => "cjk",
+        "Noto Sans KR" => "hangul",
         "Noto Sans Arabic" => "arabic",
         "Noto Sans Hebrew" => "hebrew",
         "Noto Sans" => "latin",
