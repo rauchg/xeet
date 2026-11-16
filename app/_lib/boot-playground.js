@@ -2,6 +2,7 @@ import { ASSET_URL_MAP } from "./asset-urls.js";
 import { resolveInput, resolveLinks } from "./api.js";
 import { createComposer, ensureAuthorAndAvatars } from "./composer.js";
 import { HARD } from "./hard.js";
+import { createProfilePreview } from "./profile.js";
 import { highlightAll } from "./highlight.js";
 import { cleanPost, isStatusUrl, urlsInText } from "./post.js";
 import { $, bytesToBase64, debounce, el, errorMessage, formatMs, pngSize } from "./util.js";
@@ -262,6 +263,7 @@ export function bootPlayground() {
     lookupStaticAvatar,
     onChange: () => refresh(),
   });
+  const profile = createProfilePreview();
 
   /** `/resolve-links` returns `{meta, image}` per URL; the renderer wants LinkMeta. */
   function linkMeta(entry) {
@@ -480,6 +482,7 @@ export function bootPlayground() {
     try {
       post = await buildPost(text).finally(() => (waitingOnPost = false));
       if (token !== seq) return;
+      profile.update(post.author, mode);
       suite = await renderSuiteInWorker(post, mode, activeVariants, DPR, { autoExpand, fontScale });
     } catch (error) {
       if (token === seq) {

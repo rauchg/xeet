@@ -25,6 +25,20 @@ const geistMono = localFont({
   variable: "--font-mono",
 });
 
+// X's own typeface, for the HTML profile preview. Only fetched once that
+// section renders text in it.
+const chirp = localFont({
+  src: [
+    { path: "../assets/vendor/fonts/Chirp-Regular.latin.woff2", weight: "400" },
+    { path: "../assets/vendor/fonts/Chirp-Medium.latin.woff2", weight: "500" },
+    { path: "../assets/vendor/fonts/Chirp-Bold.latin.woff2", weight: "700" },
+    { path: "../assets/vendor/fonts/Chirp-Heavy.latin.woff2", weight: "800" },
+  ],
+  display: "swap",
+  preload: false,
+  variable: "--font-chirp",
+});
+
 const SITE = "https://xeet-rs.vercel.app";
 // Next resolves og:image against `metadataBase` but leaves og:video as given,
 // and crawlers need it absolute.
@@ -76,7 +90,7 @@ export default function RootLayout({ children }) {
   return (
     <html
       lang="en"
-      className={`${geistSerif.variable} ${geistSans.variable} ${geistMono.variable}`}
+      className={`${geistSerif.variable} ${geistSans.variable} ${geistMono.variable} ${chirp.variable}`}
       suppressHydrationWarning
     >
       <head>
