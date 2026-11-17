@@ -1,0 +1,122 @@
+{
+  "at": "2026-11-16T16:09:41Z",
+  "attempts": [
+    {
+      "n": 0,
+      "observed": [],
+      "outcome": "accepted",
+      "prepared": {
+        "budget": {
+          "availableChars": 445701,
+          "charsPerToken": 4.0,
+          "contextTokens": 128000,
+          "fixedChars": 763,
+          "perRepresentationChars": 0,
+          "represented": 0,
+          "reservedOutputTokens": 16384,
+          "source": "profile"
+        },
+        "parts": [
+          {
+            "acceptance": {
+              "decision": "accept",
+              "rule": "image/*",
+              "source": "provider-reported"
+            },
+            "contentRead": false,
+            "decision": "pass-through",
+            "inspection": {
+              "bytes": 80956,
+              "class": "image",
+              "declaredMismatch": false,
+              "declaredName": "invoices.png",
+              "digest": "sha256:15b81b83902b4c53bd08f121145633089af221c168fecfeaf267dcbe8cf86b9f",
+              "dimensions": [
+                480,
+                356
+              ],
+              "index": 0,
+              "mediaType": "image/png",
+              "origin": "path"
+            },
+            "reason": "model accepts image/png (rule image/*, ProviderReported)",
+            "reused": false,
+            "steps": []
+          }
+        ],
+        "requestDigest": "sha256:772afd1706c4c8c07ea631f9b0f6614174e44560f427580543304d2d774586ec",
+        "requestSummary": [
+          {
+            "chars": 63,
+            "sha256": "sha256:33c349089c2cc22f3cd88eae8c18cbbd5cf86cefc0a680ed31f63be94d3cf384",
+            "type": "text"
+          },
+          {
+            "base64Chars": 107944,
+            "mediaType": "image/png",
+            "type": "media"
+          }
+        ]
+      }
+    }
+  ],
+  "fallback": {
+    "triggered": false
+  },
+  "format": "modality-gateway.record",
+  "id": "sha256:5f3478abc61922a206094b1532c31ce28747ed4c5cb95375a2cc7009dc151873",
+  "instructionChars": 63,
+  "instructionDigest": "sha256:33c349089c2cc22f3cd88eae8c18cbbd5cf86cefc0a680ed31f63be94d3cf384",
+  "model": {
+    "declared": [
+      {
+        "evidence": "ai-gateway /v1/models: \"text\" listed in modalities.input [\"text\", \"image\", \"pdf\"]",
+        "mediaType": "text/plain",
+        "source": "provider-reported",
+        "support": "supported"
+      },
+      {
+        "evidence": "ai-gateway /v1/models: \"image\" listed in modalities.input [\"text\", \"image\", \"pdf\"]",
+        "mediaType": "image/*",
+        "source": "provider-reported",
+        "support": "supported"
+      },
+      {
+        "evidence": "ai-gateway /v1/models: \"pdf\" listed in modalities.input [\"text\", \"image\", \"pdf\"]",
+        "mediaType": "application/pdf",
+        "source": "provider-reported",
+        "support": "supported"
+      },
+      {
+        "evidence": "ai-gateway /v1/models: \"audio\" not listed in modalities.input [\"text\", \"image\", \"pdf\"]",
+        "mediaType": "audio/*",
+        "source": "provider-reported",
+        "support": "unsupported"
+      },
+      {
+        "evidence": "ai-gateway /v1/models: \"video\" not listed in modalities.input [\"text\", \"image\", \"pdf\"]",
+        "mediaType": "video/*",
+        "source": "provider-reported",
+        "support": "unsupported"
+      }
+    ],
+    "model": "openai/gpt-4o-mini",
+    "observed": [],
+    "profileDigest": "sha256:d3fe6410d6856256d2acb1e502d0f4dab29c544a5c49b401a545e1c65659fb1a",
+    "profileSource": "provider-reported",
+    "provider": "ai-gateway",
+    "revision": "released:1721260800"
+  },
+  "providers": [
+    {
+      "id": "xeet",
+      "version": "0.1.0"
+    },
+    {
+      "id": "model-reader:openai/gpt-4o-mini",
+      "version": "0.1.0"
+    }
+  ],
+  "result": "accepted",
+  "version": "0.1"
+}

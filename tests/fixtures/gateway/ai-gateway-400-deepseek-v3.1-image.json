@@ -1,0 +1,15 @@
+{
+  "_recorded": "POST https://ai-gateway.vercel.sh/v1/chat/completions, model deepseek/deepseek-v3.1, a 1x1 PNG image_url part; HTTP 400; error object only",
+  "error": {
+    "message": "Model deepseek-ai/DeepSeek-V3.1 does not accept image input",
+    "type": "AI_APICallError",
+    "param": {
+      "error": "Model deepseek-ai/DeepSeek-V3.1 does not accept image input",
+      "statusCode": 400,
+      "name": "AI_APICallError",
+      "message": "Model deepseek-ai/DeepSeek-V3.1 does not accept image input",
+      "isRetryable": false,
+      "type": "AI_APICallError"
+    }
+  }
+}

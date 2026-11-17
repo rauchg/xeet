@@ -1,0 +1,18 @@
+[package]
+name = "xeet-artifact"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "The universal artifact format: one durable, self-describing observation with coordinated visual, semantic, provenance, state, capability and limitation representations. Source- and renderer-independent."
+
+# Deliberately tiny: the format must be readable, hashable and verifiable by a
+# consumer that has no renderer, no network and no LLM.
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+# No `float_roundtrip` or `arbitrary_precision`: features unify across the
+# workspace, and changing how the native build parses floats would split it
+# from the WASM build. Identity is computed from number tokens as written
+# (see `canon`), so it never depends on float parsing.
+serde_json = "1"
+sha2 = "0.10"

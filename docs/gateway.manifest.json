@@ -1,0 +1,238 @@
+{
+  "authority": {
+    "scopes": [
+      {
+        "id": "store:read",
+        "meaning": "read artifacts in the provider's store"
+      },
+      {
+        "id": "store:write",
+        "meaning": "add artifacts to the store (never modify or delete)"
+      },
+      {
+        "id": "fs:read",
+        "meaning": "read files and package directories inside the read roots the host allows"
+      }
+    ],
+    "summary": "Discovery grants nothing. The host that starts the provider grants scopes for a session; every invocation checks the scopes its contract names and fails with `unauthorized` listing the missing ones. No capability acts at a source system."
+  },
+  "capabilities": [
+    {
+      "authority": [
+        "store:read"
+      ],
+      "consequential": false,
+      "constraints": {
+        "deterministic": true,
+        "maxInputBytes": 16777216,
+        "network": "none",
+        "notes": [
+          "deterministic given the same providers, store and readers"
+        ]
+      },
+      "description": "Inputs the profile does not accept are inspected by content, reused if an artifact for the same bytes exists, otherwise ingested, read by a vision.read provider when one is authorized, annotated as inference, and projected within the profile's context budget. The instruction is returned unchanged as the first content item.",
+      "effects": "creates-artifact",
+      "errors": [
+        "invalid_input",
+        "unauthorized"
+      ],
+      "guarantees": [
+        "the instruction is the first content item, unchanged",
+        "inferred content is marked !inferred; content no provider could read is declared unknown",
+        "nothing is sent to any model"
+      ],
+      "id": "modality.adapt",
+      "inputModalities": [
+        "application/json",
+        "image/png",
+        "image/jpeg",
+        "application/vnd.xeet-artifact+ref"
+      ],
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "inputs": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "artifact": {
+                  "type": "string"
+                },
+                "dataBase64": {
+                  "type": "string"
+                },
+                "declaredType": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                },
+                "text": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "instruction": {
+            "description": "the user's instruction; returned unchanged",
+            "type": "string"
+          },
+          "model": {
+            "description": "a model-input-capabilities profile",
+            "required": [
+              "format",
+              "version",
+              "provider",
+              "model",
+              "inputs",
+              "structuredInput",
+              "source"
+            ],
+            "type": "object"
+          },
+          "now": {
+            "description": "ISO 8601 time for captures; defaults to the host clock",
+            "type": "string"
+          }
+        },
+        "required": [
+          "instruction",
+          "inputs",
+          "model"
+        ],
+        "type": "object"
+      },
+      "limitations": [
+        "see the provider's limitations"
+      ],
+      "modes": [
+        {
+          "note": "every content part is text; the record comes as structured data",
+          "output": [
+            "text/plain"
+          ],
+          "select": {
+            "model": "a profile that accepts only text"
+          }
+        },
+        {
+          "note": "accepted media pass through unchanged",
+          "output": [
+            "text/plain",
+            "image/png",
+            "image/jpeg"
+          ],
+          "select": {
+            "model": "a profile that accepts images"
+          }
+        }
+      ],
+      "outcomes": [
+        "make an image readable by a text-only model",
+        "convert an attachment for a model that cannot read it",
+        "adapt inputs to model capabilities",
+        "the model does not support images",
+        "prepare a model request from a screenshot",
+        "understand a screenshot without vision"
+      ],
+      "outputSchema": {
+        "properties": {
+          "budget": {
+            "type": "object"
+          },
+          "content": {
+            "items": {
+              "required": [
+                "type"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "parts": {
+            "type": "array"
+          },
+          "requestDigest": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "content",
+          "parts",
+          "budget",
+          "requestDigest"
+        ],
+        "type": "object"
+      },
+      "preconditions": [
+        "each transformation step needs its own provider's scopes (store:write to ingest, vision:read to read); missing ones are reported per step, not escalated"
+      ],
+      "summary": "Given an instruction, inputs and a model capability profile, return content that model can consume: accepted inputs as-is, others as provenance-preserving text representations, with a decision record.",
+      "title": "Adapt inputs to a model's input modalities",
+      "version": "0.1"
+    }
+  ],
+  "compatibility": {
+    "artifactFormat": "xeet-artifact",
+    "artifactVersionWritten": "0.1",
+    "artifactVersionsRead": "0.x",
+    "contractVersion": "0.1",
+    "notes": [
+      "contract ids name capabilities, not this provider; minor versions only add optional fields",
+      "unknown input fields are rejected, unknown output fields must be ignored"
+    ],
+    "projectionFormat": "xeet-artifact.projection 0.1"
+  },
+  "constraints": {
+    "deterministic": true,
+    "maxInputBytes": 16777216,
+    "network": "none",
+    "notes": [
+      "single process, local filesystem store",
+      "no clock except the host-supplied capture time"
+    ]
+  },
+  "format": "representation-engine.manifest",
+  "interfaces": [
+    {
+      "description": "`xeet engine mcp`: progressive tools (engine_discover, engine_describe, engine_invoke) by default, every capability as a tool with --tools all; artifacts as resources",
+      "kind": "mcp-stdio"
+    },
+    {
+      "description": "`xeet engine manifest | discover | describe | call <capability> --input JSON`",
+      "kind": "cli"
+    },
+    {
+      "description": "xeet_engine::Engine::invoke(capability, input, session)",
+      "kind": "rust"
+    }
+  ],
+  "limitations": [
+    "reads content only through providers that declare vision.read; without one, an image's content is reported as unknown",
+    "ingests images only (PNG, JPEG, GIF, WebP); other modalities are reported as not deliverable"
+  ],
+  "nonCapabilities": [
+    {
+      "alternative": "inject modality.adapt's content into your own model request (or use xeet-gateway's Gateway::run in Rust with your ModelClient)",
+      "outcomes": [
+        "send a request to a model",
+        "call the model",
+        "connect to my model runtime"
+      ],
+      "why": "the gateway prepares content; sending it is the runtime's model client's job"
+    }
+  ],
+  "provider": {
+    "description": "Prepares inputs for a model whose input modalities are stated in a profile: passes through what it accepts, represents the rest as text through other providers' contracts, and records why.",
+    "id": "xeet-gateway",
+    "name": "xeet modality gateway",
+    "version": "0.1.0"
+  },
+  "sources": [],
+  "version": "0.1"
+}

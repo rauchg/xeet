@@ -1,0 +1,756 @@
+{
+  "assets": [
+    {
+      "bytes": 37750,
+      "mediaType": "image/png",
+      "path": "assets/54f5d325c3977984bea2837f0757b367c3aaeb892c8428a8c3b7ec3526614611.png",
+      "sha256": "sha256:54f5d325c3977984bea2837f0757b367c3aaeb892c8428a8c3b7ec3526614611"
+    },
+    {
+      "bytes": 528,
+      "mediaType": "application/json",
+      "path": "assets/f5b77e5b9b04fe10d489d07a51c821148ffa6a7f760173d738cf3ffb0f308061.json",
+      "sha256": "sha256:f5b77e5b9b04fe10d489d07a51c821148ffa6a7f760173d738cf3ffb0f308061"
+    }
+  ],
+  "capabilities": [
+    {
+      "authority": {
+        "checkedBy": "none",
+        "required": []
+      },
+      "availability": "delegated",
+      "effects": [
+        "none at the source"
+      ],
+      "executor": {
+        "kind": "user-agent",
+        "reference": "https://vercel.com/blog/the-thing"
+      },
+      "id": "open-link.0",
+      "inputSchema": {
+        "properties": {},
+        "type": "object"
+      },
+      "kind": "navigate",
+      "preconditions": [
+        "the URL still resolves (true at capture time at most)"
+      ],
+      "target": "entity.0",
+      "title": "Open vercel.com/blog/the-thing",
+      "verification": "the user agent reaches the URL"
+    },
+    {
+      "authority": {
+        "checkedBy": "none",
+        "required": []
+      },
+      "availability": "delegated",
+      "effects": [
+        "none at the source"
+      ],
+      "executor": {
+        "kind": "user-agent",
+        "reference": "https://x.com/rauchg"
+      },
+      "id": "open-author",
+      "inputSchema": {
+        "properties": {},
+        "type": "object"
+      },
+      "kind": "navigate",
+      "preconditions": [
+        "the URL still resolves (true at capture time at most)"
+      ],
+      "target": "author",
+      "title": "Open the author's profile",
+      "verification": "the user agent reaches the URL"
+    },
+    {
+      "authority": {
+        "checkedBy": "none",
+        "required": []
+      },
+      "availability": "local-executable",
+      "effects": [
+        "a derived artifact whose view uses the given theme",
+        "nothing at the source"
+      ],
+      "executor": {
+        "kind": "local",
+        "reference": "xeet-capture/x (xeet-core render)"
+      },
+      "id": "retheme",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "theme": {
+            "enum": [
+              "light",
+              "dark"
+            ]
+          }
+        },
+        "required": [
+          "theme"
+        ],
+        "type": "object"
+      },
+      "kind": "projection",
+      "preconditions": [
+        "the artifact's source-post input is present"
+      ],
+      "target": "post",
+      "title": "Render the same observation in another theme",
+      "verification": "the derived artifact verifies, reproduces, and names this artifact in provenance.derivedFrom"
+    }
+  ],
+  "capabilityPolicy": "descriptive-only",
+  "coverage": {
+    "bounds": "partial",
+    "capabilities": "partial",
+    "provenance": "supported",
+    "reproduction": "supported",
+    "semantic": "partial",
+    "state": "partial",
+    "visual": "supported"
+  },
+  "format": "xeet-artifact",
+  "formatVersion": "0.1",
+  "id": "sha256:ffa6900e03d6ab4e50f9022801e06d492f851b0fce2e72a6c8e1c07779f7b357",
+  "limitations": {
+    "approximated": [
+      {
+        "subject": "author.avatar",
+        "what": "avatar drawn as a neutral placeholder",
+        "why": "no avatar bytes in the source data"
+      },
+      {
+        "subject": "card",
+        "what": "card image drawn as a placeholder with the correct geometry",
+        "why": "no image bytes in the source data"
+      }
+    ],
+    "derived": [
+      {
+        "subject": "post",
+        "what": "visible text, entities, hidden ranges, the Show more cut and the attachment choice",
+        "why": "decided by ruleset x-web@55591fe0"
+      },
+      {
+        "what": "element bounds",
+        "why": "the frame's named layout boxes for this render (the geometry the repository gates against Chrome)"
+      }
+    ],
+    "inferred": [],
+    "omitted": [
+      {
+        "subject": "post",
+        "what": "post time",
+        "why": "not in the source data; rendered as a just-sent post"
+      },
+      {
+        "subject": "body",
+        "what": "authored text range [58, 92] (utf16) is not shown",
+        "why": "trailing URL replaced by its card"
+      },
+      {
+        "subject": "body",
+        "what": "per-entity bounds",
+        "why": "the frame records line boxes, not entity boxes; entities carry text ranges instead"
+      },
+      {
+        "subject": "post",
+        "what": "interaction capabilities (reply, repost, like)",
+        "why": "no source id or URL: this is not a post that exists on X"
+      }
+    ],
+    "unverified": [
+      {
+        "what": "source authenticity",
+        "why": "the adapter maps the data it is given; it does not prove the post came from X"
+      },
+      {
+        "subject": "v0",
+        "what": "pixel parity of this specific view against Chrome",
+        "why": "not compared at capture; the ruleset is oracle-gated in the repository's CI"
+      }
+    ]
+  },
+  "provenance": {
+    "adapter": {
+      "name": "xeet-capture/x",
+      "version": "0.1.0"
+    },
+    "authenticity": "unverified",
+    "capture": {
+      "capturedAt": "2026-11-16T12:00:00Z",
+      "capturedBy": {
+        "name": "xeet-capture/x",
+        "version": "0.1.0"
+      },
+      "method": "fixture"
+    },
+    "inputs": [
+      {
+        "asset": "sha256:f5b77e5b9b04fe10d489d07a51c821148ffa6a7f760173d738cf3ffb0f308061",
+        "role": "source-post"
+      }
+    ],
+    "source": {
+      "timestamps": {},
+      "type": "x"
+    },
+    "transformations": [
+      {
+        "deterministic": true,
+        "inputs": [
+          "sha256:f5b77e5b9b04fe10d489d07a51c821148ffa6a7f760173d738cf3ffb0f308061"
+        ],
+        "outputs": [
+          "model::Post"
+        ],
+        "step": "parse-and-validate",
+        "tool": {
+          "name": "xeet-core",
+          "ruleset": "x-web@55591fe0",
+          "version": "0.1.0"
+        }
+      },
+      {
+        "deterministic": true,
+        "inputs": [
+          "model::Post",
+          "views.v0.config"
+        ],
+        "outputs": [
+          "report",
+          "geometry"
+        ],
+        "step": "decide-and-layout",
+        "tool": {
+          "name": "xeet-core",
+          "ruleset": "x-web@55591fe0",
+          "version": "0.1.0"
+        }
+      },
+      {
+        "deterministic": true,
+        "inputs": [
+          "display-list"
+        ],
+        "outputs": [
+          "sha256:54f5d325c3977984bea2837f0757b367c3aaeb892c8428a8c3b7ec3526614611"
+        ],
+        "step": "rasterize",
+        "tool": {
+          "name": "xeet-core",
+          "ruleset": "x-web@55591fe0",
+          "version": "0.1.0"
+        }
+      },
+      {
+        "deterministic": true,
+        "inputs": [
+          "report",
+          "geometry"
+        ],
+        "outputs": [
+          "semantic",
+          "state",
+          "capabilities"
+        ],
+        "step": "map-semantics",
+        "tool": {
+          "name": "xeet-capture/x",
+          "version": "0.1.0"
+        }
+      }
+    ]
+  },
+  "semantic": {
+    "elements": [
+      {
+        "attrs": {
+          "x.ruleset": "x-web@55591fe0",
+          "x.surface": "web-timeline"
+        },
+        "basis": "source",
+        "bounds": [
+          {
+            "h": 313.25,
+            "view": "v0",
+            "w": 390.0,
+            "x": 0.0,
+            "y": 0.0
+          }
+        ],
+        "children": [
+          "author",
+          "body",
+          "card",
+          "actions"
+        ],
+        "id": "post",
+        "kind": "record",
+        "role": "x.post",
+        "text": "Two links, one card: vercel.com/blog/the-thing and",
+        "visible": true
+      },
+      {
+        "attrs": {
+          "x.handle": "rauchg",
+          "x.protected": false,
+          "x.verified": "blue"
+        },
+        "basis": "source",
+        "children": [
+          "author.name",
+          "author.handle",
+          "author.avatar",
+          "author.badge"
+        ],
+        "id": "author",
+        "kind": "identity",
+        "role": "x.author",
+        "text": "Guillermo Rauch",
+        "value": "rauchg",
+        "visible": true
+      },
+      {
+        "basis": "source",
+        "bounds": [
+          {
+            "h": 20.0,
+            "view": "v0",
+            "w": 119.5625,
+            "x": 64.0,
+            "y": 12.0
+          }
+        ],
+        "id": "author.name",
+        "kind": "text",
+        "role": "x.author.name",
+        "text": "Guillermo Rauch",
+        "visible": true
+      },
+      {
+        "basis": "source",
+        "bounds": [
+          {
+            "h": 20.0,
+            "view": "v0",
+            "w": 60.015625,
+            "x": 206.5625,
+            "y": 12.0
+          }
+        ],
+        "id": "author.handle",
+        "kind": "text",
+        "role": "x.author.handle",
+        "text": "@rauchg",
+        "visible": true
+      },
+      {
+        "attrs": {
+          "x.hasBytes": false
+        },
+        "basis": "source",
+        "bounds": [
+          {
+            "h": 40.0,
+            "view": "v0",
+            "w": 40.0,
+            "x": 16.0,
+            "y": 12.0
+          }
+        ],
+        "id": "author.avatar",
+        "kind": "media",
+        "role": "x.author.avatar",
+        "visible": true
+      },
+      {
+        "basis": "source",
+        "bounds": [
+          {
+            "h": 15.0,
+            "view": "v0",
+            "w": 15.0,
+            "x": 187.5625,
+            "y": 14.5
+          }
+        ],
+        "id": "author.badge",
+        "kind": "status",
+        "role": "x.verified",
+        "value": "blue",
+        "visible": true
+      },
+      {
+        "attrs": {
+          "x.authoredText": "Two links, one card: https://vercel.com/blog/the-thing and https://github.com/vercel/next.js",
+          "x.lines": 2
+        },
+        "basis": "derived",
+        "bounds": [
+          {
+            "h": 40.0,
+            "view": "v0",
+            "w": 310.0,
+            "x": 64.0,
+            "y": 34.0
+          }
+        ],
+        "children": [
+          "entity.0",
+          "entity.1"
+        ],
+        "id": "body",
+        "kind": "text",
+        "role": "x.body",
+        "text": "Two links, one card: vercel.com/blog/the-thing and",
+        "visible": true
+      },
+      {
+        "basis": "source",
+        "bounds": [
+          {
+            "h": 20.0,
+            "view": "v0",
+            "w": 326.0,
+            "x": 56.0,
+            "y": 281.25
+          }
+        ],
+        "children": [
+          "action.reply",
+          "action.repost",
+          "action.like",
+          "action.views",
+          "action.bookmark",
+          "action.share"
+        ],
+        "id": "actions",
+        "kind": "group",
+        "role": "x.actionRow",
+        "visible": true
+      },
+      {
+        "attrs": {
+          "x.range": [
+            21,
+            54
+          ],
+          "x.rangeUnit": "utf16"
+        },
+        "basis": "derived",
+        "id": "entity.0",
+        "kind": "link",
+        "role": "x.url",
+        "text": "vercel.com/blog/the-thing",
+        "value": "https://vercel.com/blog/the-thing",
+        "visible": true
+      },
+      {
+        "attrs": {
+          "x.range": [
+            59,
+            92
+          ],
+          "x.rangeUnit": "utf16"
+        },
+        "basis": "derived",
+        "id": "entity.1",
+        "kind": "link",
+        "role": "x.url",
+        "text": "github.com/vercel/next.js",
+        "value": "https://github.com/vercel/next.js",
+        "visible": false
+      },
+      {
+        "attrs": {
+          "x.cardType": "summary_large_image",
+          "x.description": null,
+          "x.domain": null
+        },
+        "basis": "source",
+        "bounds": [
+          {
+            "h": 183.25,
+            "view": "v0",
+            "w": 310.0,
+            "x": 64.0,
+            "y": 86.0
+          }
+        ],
+        "id": "card",
+        "kind": "link",
+        "role": "x.card",
+        "text": "next.js",
+        "value": "https://github.com/vercel/next.js",
+        "visible": true
+      },
+      {
+        "basis": "source",
+        "bounds": [
+          {
+            "h": 36.0,
+            "view": "v0",
+            "w": 58.875,
+            "x": 56.0,
+            "y": 273.25
+          }
+        ],
+        "id": "action.reply",
+        "kind": "affordance",
+        "role": "x.action.reply",
+        "unit": "reply",
+        "value": 12,
+        "visible": true
+      },
+      {
+        "basis": "source",
+        "bounds": [
+          {
+            "h": 36.0,
+            "view": "v0",
+            "w": 58.875,
+            "x": 118.125,
+            "y": 273.25
+          }
+        ],
+        "id": "action.repost",
+        "kind": "affordance",
+        "role": "x.action.repost",
+        "unit": "repost",
+        "value": 34,
+        "visible": true
+      },
+      {
+        "basis": "source",
+        "bounds": [
+          {
+            "h": 36.0,
+            "view": "v0",
+            "w": 71.0,
+            "x": 180.25,
+            "y": 273.25
+          }
+        ],
+        "id": "action.like",
+        "kind": "affordance",
+        "role": "x.action.like",
+        "unit": "like",
+        "value": 2100,
+        "visible": true
+      },
+      {
+        "basis": "source",
+        "bounds": [
+          {
+            "h": 36.0,
+            "view": "v0",
+            "w": 67.5,
+            "x": 242.375,
+            "y": 273.25
+          }
+        ],
+        "id": "action.views",
+        "kind": "affordance",
+        "role": "x.action.views",
+        "unit": "views",
+        "value": 98000,
+        "visible": true
+      },
+      {
+        "basis": "source",
+        "bounds": [
+          {
+            "h": 36.0,
+            "view": "v0",
+            "w": 38.75,
+            "x": 304.5,
+            "y": 273.25
+          }
+        ],
+        "id": "action.bookmark",
+        "kind": "affordance",
+        "role": "x.action.bookmark",
+        "unit": "bookmark",
+        "value": 57,
+        "visible": true
+      },
+      {
+        "basis": "source",
+        "bounds": [
+          {
+            "h": 36.0,
+            "view": "v0",
+            "w": 38.75,
+            "x": 343.25,
+            "y": 273.25
+          }
+        ],
+        "id": "action.share",
+        "kind": "affordance",
+        "role": "x.action.share",
+        "visible": true
+      }
+    ],
+    "relations": [
+      {
+        "basis": "source",
+        "from": "post",
+        "kind": "authoredBy",
+        "to": "author"
+      },
+      {
+        "basis": "derived",
+        "from": "card",
+        "kind": "attachedTo",
+        "to": "post"
+      }
+    ],
+    "root": "post"
+  },
+  "state": {
+    "asOf": "2026-11-16T12:00:00Z",
+    "facts": [
+      {
+        "basis": "source",
+        "key": "verified",
+        "subject": "author",
+        "value": "blue",
+        "volatile": true
+      },
+      {
+        "basis": "source",
+        "key": "replyCount",
+        "subject": "post",
+        "value": 12,
+        "volatile": true
+      },
+      {
+        "basis": "source",
+        "key": "repostCount",
+        "subject": "post",
+        "value": 34,
+        "volatile": true
+      },
+      {
+        "basis": "source",
+        "key": "likeCount",
+        "subject": "post",
+        "value": 2100,
+        "volatile": true
+      },
+      {
+        "basis": "source",
+        "key": "viewsCount",
+        "subject": "post",
+        "value": 98000,
+        "volatile": true
+      },
+      {
+        "basis": "source",
+        "key": "bookmarkCount",
+        "subject": "post",
+        "value": 57,
+        "volatile": true
+      },
+      {
+        "basis": "unknown",
+        "key": "createdAt",
+        "subject": "post",
+        "value": null,
+        "volatile": false
+      },
+      {
+        "basis": "unknown",
+        "key": "inReplyTo",
+        "subject": "post",
+        "value": null,
+        "volatile": false
+      },
+      {
+        "basis": "source",
+        "key": "pinned",
+        "subject": "post",
+        "value": false,
+        "volatile": true
+      },
+      {
+        "basis": "derived",
+        "key": "longPost",
+        "subject": "post",
+        "value": false,
+        "volatile": false
+      },
+      {
+        "basis": "derived",
+        "key": "weightedLength",
+        "subject": "post",
+        "value": 72,
+        "volatile": false
+      },
+      {
+        "basis": "derived",
+        "key": "lengthValid",
+        "subject": "post",
+        "value": true,
+        "volatile": false
+      },
+      {
+        "basis": "derived",
+        "key": "showMore",
+        "subject": "body",
+        "value": "none",
+        "volatile": false
+      },
+      {
+        "basis": "unknown",
+        "key": "existsAtSource",
+        "subject": "post",
+        "value": null,
+        "volatile": true
+      }
+    ],
+    "temporal": "historical-observation"
+  },
+  "subject": {
+    "element": "post",
+    "title": "@rauchg: Two links, one card: vercel.com/blog/the-thing and",
+    "type": "x.post"
+  },
+  "views": [
+    {
+      "asset": "sha256:54f5d325c3977984bea2837f0757b367c3aaeb892c8428a8c3b7ec3526614611",
+      "config": {
+        "dpr": 1.0,
+        "expanded": false,
+        "fontScale": 1.0,
+        "surface": "web-timeline",
+        "theme": "light",
+        "width": 390.0
+      },
+      "fidelity": {
+        "claim": "oracle-verified",
+        "evidence": "ruleset x-web@55591fe0 lists this surface in verifiedFor; gates: crates/xeet-core/examples/frame_parity.rs, tests/golden/e2e.json",
+        "target": "x.com web-timeline in Chrome"
+      },
+      "id": "v0",
+      "layoutHeight": 314.0,
+      "layoutWidth": 390.0,
+      "mediaType": "image/png",
+      "pixelHeight": 314,
+      "pixelWidth": 390,
+      "renderer": {
+        "name": "xeet-core",
+        "ruleset": "x-web@55591fe0",
+        "version": "0.1.0"
+      },
+      "scale": 1.0
+    }
+  ]
+}

@@ -1,2 +1,8 @@
 packages:
   - "packages/*"
+minimumReleaseAgeExclude:
+  - "@xeet/cli-darwin-arm64@0.1.0"
+  - "@xeet/cli-darwin-x64@0.1.0"
+  - "@xeet/cli-linux-arm64@0.1.0"
+  - "@xeet/cli-win32-arm64@0.1.0"
+  - "@xeet/cli-win32-x64@0.1.0"

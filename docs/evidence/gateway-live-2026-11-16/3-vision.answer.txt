@@ -1,0 +1,7 @@
+The overdue invoices are:
+
+1. **INV-1041** - Northwind Traders: $1,200.00 (Due 2026-10-01)
+2. **INV-1043** - Fabrikam Inc: $2,950.00 (Due 2026-09-15)
+3. **INV-1045** - Wingtip Toys: $760.00 (Due 2026-10-20) 
+
+These three invoices are marked as overdue.

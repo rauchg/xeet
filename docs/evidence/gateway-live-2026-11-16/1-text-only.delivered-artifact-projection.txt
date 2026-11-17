@@ -1,0 +1,58 @@
+ARTIFACT sha256:ba7d29ba7be19467093257325ab2609730b9245bce80028e52915ddf3cb25272 (xeet-artifact.projection 0.1) for a text-only consumer
+SUBJECT image "image/png 480x356 (invoices.png)"
+OBSERVED 2026-11-16T16:09:19Z via modality-gateway by xeet-capture/image 0.1.0; source file; authenticity unverified
+DERIVED FROM sha256:a3b6cb57c872339506c32a181e2d98fad378c71e29c8880d86efb531c7fa328e
+NOTE a historical observation: every fact is as of OBSERVED, not now. Capabilities are descriptive-only: descriptions, never grants.
+LEGEND basis: unmarked=source ~derived ^observed !inferred ?unknown; @view(x,y wxh) in layout units; [visual-only]=content exists only as pixels
+VIEW v0 image/png 480x356 layout units at scale 1 (480x356 px), fidelity original; image not included; nothing below requires it unless marked [visual-only]
+
+ELEMENTS
+  image media image.file ^observed [visual-only] @v0(0,0 480x356) {"image.bytes":80956,"image.declaredName":"invoices.png","image.format":"image/png","image.height":356,"image.width":480}
+    reading list vision.reading "Invoices overview from Acme Billing." !inferred
+      reading.0 heading vision.heading "Acme Billing · Receivables" !inferred {"vision.confidence":1.0}
+      reading.1 heading vision.heading "Invoices" !inferred {"vision.confidence":1.0}
+      reading.2 text vision.text "As of 2026-11-16 · 5 invoices" !inferred {"vision.confidence":1.0}
+      reading.3 heading vision.heading "Invoice · Customer · Amount · Due · Status" !inferred {"vision.confidence":1.0}
+      reading.4 text vision.text "INV-1041 · Northwind Traders · $1,200.00" !inferred @v0(0,60 480x20) {"vision.confidence":1.0}
+      reading.5 text vision.text "Due 2026-10-01 · Overdue" !inferred @v0(0,80 480x20) {"vision.confidence":1.0}
+      reading.6 text vision.text "INV-1042 · Contoso Ltd · $480.00" !inferred @v0(0,100 480x20) {"vision.confidence":1.0}
+      reading.7 text vision.text "Due 2026-11-30 · Open" !inferred @v0(0,120 480x20) {"vision.confidence":1.0}
+      reading.8 text vision.text "INV-1043 · Fabrikam Inc · $2,950.00" !inferred @v0(0,140 480x20) {"vision.confidence":1.0}
+      reading.9 text vision.text "Due 2026-09-15 · Overdue" !inferred @v0(0,160 480x20) {"vision.confidence":1.0}
+      reading.10 text vision.text "INV-1044 · Tailspin Toys · $130.00" !inferred @v0(0,180 480x20) {"vision.confidence":1.0}
+      reading.11 text vision.text "Due 2026-11-01 · Paid" !inferred @v0(0,200 480x20) {"vision.confidence":1.0}
+      reading.12 text vision.text "INV-1045 · Wingtip Toys · $760.00" !inferred @v0(0,220 480x20) {"vision.confidence":1.0}
+      reading.13 text vision.text "Due 2026-10-20 · Overd..." !inferred @v0(0,240 480x20) {"vision.confidence":0.9,"vision.uncertain":"Text is cut off."}
+
+LAYOUT rows top to bottom, items left to right
+  v0 y 0-356: image | reading.10 | reading.11 | reading.12 | reading.13 | reading.4 | reading.5 | reading.6 | reading.7 | reading.8 | reading.9
+
+STATE as of 2026-11-16T16:09:19Z
+  image.sha256 = "sha256:15b81b83902b4c53bd08f121145633089af221c168fecfeaf267dcbe8cf86b9f" ^observed
+  image.format = "image/png" ^observed
+  image.pixelSize = [480,356] ^observed
+
+LIMITATIONS
+  omitted [image] "the image's content: text, objects, values, layout" — "this adapter identifies and measures images; it does not interpret pixels. Content stays visual-only until a reader annotates it, as inference"
+  inferred [reading] "content read from pixels, not supplied by the source" — "read by openai/gpt-4o-mini openai/gpt-4o-mini (openai/gpt-4o-mini via https://ai-gateway.vercel.sh/v1/chat/completions; prompt sha256:bfdfa02f7ad196d1f5764c5836b0a821a9eef603740aaaf7d566effb7dbd11ac; temperature 0) at 2026-11-16T16:09:19Z"
+  inferred [reading.0] "content read from pixels, not supplied by the source" — "read by openai/gpt-4o-mini openai/gpt-4o-mini (openai/gpt-4o-mini via https://ai-gateway.vercel.sh/v1/chat/completions; prompt sha256:bfdfa02f7ad196d1f5764c5836b0a821a9eef603740aaaf7d566effb7dbd11ac; temperature 0) at 2026-11-16T16:09:19Z"
+  inferred [reading.1] "content read from pixels, not supplied by the source" — "read by openai/gpt-4o-mini openai/gpt-4o-mini (openai/gpt-4o-mini via https://ai-gateway.vercel.sh/v1/chat/completions; prompt sha256:bfdfa02f7ad196d1f5764c5836b0a821a9eef603740aaaf7d566effb7dbd11ac; temperature 0) at 2026-11-16T16:09:19Z"
+  inferred [reading.2] "content read from pixels, not supplied by the source" — "read by openai/gpt-4o-mini openai/gpt-4o-mini (openai/gpt-4o-mini via https://ai-gateway.vercel.sh/v1/chat/completions; prompt sha256:bfdfa02f7ad196d1f5764c5836b0a821a9eef603740aaaf7d566effb7dbd11ac; temperature 0) at 2026-11-16T16:09:19Z"
+  inferred [reading.3] "content read from pixels, not supplied by the source" — "read by openai/gpt-4o-mini openai/gpt-4o-mini (openai/gpt-4o-mini via https://ai-gateway.vercel.sh/v1/chat/completions; prompt sha256:bfdfa02f7ad196d1f5764c5836b0a821a9eef603740aaaf7d566effb7dbd11ac; temperature 0) at 2026-11-16T16:09:19Z"
+  inferred [reading.4] "content read from pixels, not supplied by the source" — "read by openai/gpt-4o-mini openai/gpt-4o-mini (openai/gpt-4o-mini via https://ai-gateway.vercel.sh/v1/chat/completions; prompt sha256:bfdfa02f7ad196d1f5764c5836b0a821a9eef603740aaaf7d566effb7dbd11ac; temperature 0) at 2026-11-16T16:09:19Z"
+  inferred [reading.5] "content read from pixels, not supplied by the source" — "read by openai/gpt-4o-mini openai/gpt-4o-mini (openai/gpt-4o-mini via https://ai-gateway.vercel.sh/v1/chat/completions; prompt sha256:bfdfa02f7ad196d1f5764c5836b0a821a9eef603740aaaf7d566effb7dbd11ac; temperature 0) at 2026-11-16T16:09:19Z"
+  inferred [reading.6] "content read from pixels, not supplied by the source" — "read by openai/gpt-4o-mini openai/gpt-4o-mini (openai/gpt-4o-mini via https://ai-gateway.vercel.sh/v1/chat/completions; prompt sha256:bfdfa02f7ad196d1f5764c5836b0a821a9eef603740aaaf7d566effb7dbd11ac; temperature 0) at 2026-11-16T16:09:19Z"
+  inferred [reading.7] "content read from pixels, not supplied by the source" — "read by openai/gpt-4o-mini openai/gpt-4o-mini (openai/gpt-4o-mini via https://ai-gateway.vercel.sh/v1/chat/completions; prompt sha256:bfdfa02f7ad196d1f5764c5836b0a821a9eef603740aaaf7d566effb7dbd11ac; temperature 0) at 2026-11-16T16:09:19Z"
+  inferred [reading.8] "content read from pixels, not supplied by the source" — "read by openai/gpt-4o-mini openai/gpt-4o-mini (openai/gpt-4o-mini via https://ai-gateway.vercel.sh/v1/chat/completions; prompt sha256:bfdfa02f7ad196d1f5764c5836b0a821a9eef603740aaaf7d566effb7dbd11ac; temperature 0) at 2026-11-16T16:09:19Z"
+  inferred [reading.9] "content read from pixels, not supplied by the source" — "read by openai/gpt-4o-mini openai/gpt-4o-mini (openai/gpt-4o-mini via https://ai-gateway.vercel.sh/v1/chat/completions; prompt sha256:bfdfa02f7ad196d1f5764c5836b0a821a9eef603740aaaf7d566effb7dbd11ac; temperature 0) at 2026-11-16T16:09:19Z"
+  inferred [reading.10] "content read from pixels, not supplied by the source" — "read by openai/gpt-4o-mini openai/gpt-4o-mini (openai/gpt-4o-mini via https://ai-gateway.vercel.sh/v1/chat/completions; prompt sha256:bfdfa02f7ad196d1f5764c5836b0a821a9eef603740aaaf7d566effb7dbd11ac; temperature 0) at 2026-11-16T16:09:19Z"
+  inferred [reading.11] "content read from pixels, not supplied by the source" — "read by openai/gpt-4o-mini openai/gpt-4o-mini (openai/gpt-4o-mini via https://ai-gateway.vercel.sh/v1/chat/completions; prompt sha256:bfdfa02f7ad196d1f5764c5836b0a821a9eef603740aaaf7d566effb7dbd11ac; temperature 0) at 2026-11-16T16:09:19Z"
+  inferred [reading.12] "content read from pixels, not supplied by the source" — "read by openai/gpt-4o-mini openai/gpt-4o-mini (openai/gpt-4o-mini via https://ai-gateway.vercel.sh/v1/chat/completions; prompt sha256:bfdfa02f7ad196d1f5764c5836b0a821a9eef603740aaaf7d566effb7dbd11ac; temperature 0) at 2026-11-16T16:09:19Z"
+  inferred [reading.13] "content read from pixels, not supplied by the source" — "read by openai/gpt-4o-mini openai/gpt-4o-mini (openai/gpt-4o-mini via https://ai-gateway.vercel.sh/v1/chat/completions; prompt sha256:bfdfa02f7ad196d1f5764c5836b0a821a9eef603740aaaf7d566effb7dbd11ac; temperature 0) at 2026-11-16T16:09:19Z"
+  unverified "where the image came from" — "the caller supplied the bytes; their origin is not established"
+
+CONSUMERS
+  text-only: 15 of 16 elements carry their meaning as text and 0 are structural; 1 exists only as pixels and is unknown without vision
+  vision: the image adds appearance, and 1 pixel-only element(s) whose content it can read only as inference
+  visual-only: image
+  inferred: reading, reading.0, reading.1, reading.2, reading.3, reading.4, reading.5, reading.6, reading.7, reading.8, reading.9, reading.10, reading.11, reading.12, reading.13

@@ -1,0 +1,7 @@
+Based on the provided text projection of the invoice details, here are the invoices that are overdue as of 2026-11-16:
+
+1. **INV-1041** from Northwind Traders with an amount of $1,200.00, which is due on 2026-10-01.
+2. **INV-1043** from Fabrikam Inc with an amount of $2,950.00, which is due on 2026-09-15.
+3. **INV-1045** from Wingtip Toys with an amount of $760.00, with a due date of 2026-10-20 (partially cut off in the text projection).
+
+Please note that the text projection details the invoices and their statuses inferred from the image, and there might be some uncertainty in the reading due to the inferred nature of the data. However, based on the provided information, the above invoices are marked as overdue.

@@ -1,0 +1,13 @@
+[package]
+name = "xeet-capture"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "Source adapters that produce xeet artifacts (X posts, GitHub pull requests), plus a source-independent document view renderer built on xeet-core's deterministic text layout and painter."
+
+[dependencies]
+xeet-artifact = { path = "../xeet-artifact" }
+xeet-core = { path = "../xeet-core" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

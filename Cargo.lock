@@ -1108,12 +1108,36 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3ad82d2a33cdc9674dc7465672f271e096168fcdbe0f799d9e6db8c5892679dc"
 
 [[package]]
+name = "xeet-artifact"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "sha2",
+]
+
+[[package]]
+name = "xeet-capture"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "xeet-artifact",
+ "xeet-core",
+]
+
+[[package]]
 name = "xeet-cli"
 version = "0.1.2"
 dependencies = [
  "serde",
  "serde_json",
+ "xeet-artifact",
+ "xeet-capture",
  "xeet-core",
+ "xeet-engine",
+ "xeet-gateway",
+ "xeet-ocr",
  "xeet-resolve",
  "xeet-resolve-net",
  "xeet-text",
@@ -1136,6 +1160,42 @@ dependencies = [
  "unicode-bidi",
  "xeet-text",
  "zune-jpeg",
+]
+
+[[package]]
+name = "xeet-engine"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "xeet-artifact",
+ "xeet-capture",
+ "xeet-core",
+]
+
+[[package]]
+name = "xeet-gateway"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "sha2",
+ "xeet-artifact",
+ "xeet-capture",
+ "xeet-engine",
+]
+
+[[package]]
+name = "xeet-ocr"
+version = "0.1.0"
+dependencies = [
+ "png",
+ "serde",
+ "serde_json",
+ "xeet-artifact",
+ "xeet-capture",
+ "xeet-engine",
+ "xeet-gateway",
 ]
 
 [[package]]
