@@ -94,6 +94,24 @@ X's card docs went offline on 2026-11-02 (the old addresses redirect to
    them to reserve the box — and cached. Dropped, with a note, when it is not
    JPG/PNG/WEBP/GIF, over 5 MB, unreadable, or smaller than 144×144. With
    `media: true` the bytes are inlined as base64 in `post.links[url].image.data`.
+   What X shows for a large or player card is not that file. X re-hosts
+   the picture on its image service and the client asks for a copy fitted in
+   a square box, the smallest of `name=small` (680), `900x900`, `medium`
+   (1200) and `large` (2048) that is wider than the picture's slot in device
+   pixels, the rule photos follow; Chrome scales the copy. A signed-in dpr 2
+   session asked for `small` at card boxes of 284–336 css px, `900x900` at
+   340–416 and `medium` at 476 and 564; nothing changes at the 512 px
+   viewport breakpoint. Nobody but X can fetch that copy for an unpublished
+   link, so the card layout marks the picture (`Item::Image.service`), the
+   painter picks the box from the slot and the dpr (`paint::service_box`) and
+   reproduces the resize (`paint::service_copy`, Lanczos-3) before it samples.
+   A picture that already fits its box is drawn as given, so a phone at dpr 3
+   with a 1200 px original draws what it always did. Against a 2× capture of
+   a mobile-web cell whose card picture was 2400 px wide, scaling the original
+   straight down left 2,599 mismatched pixels in the card; through the 680
+   copy, 68 (measured with the fork's renderer, which draws that cell). The
+   `summary` thumbnail's variant is not measured, so it draws the file as
+   given.
 5. **Display**: `xeet-text`'s form of the final URL, unless the post already came
    from a capture (`post.links[url].display` from the payload wins: a bit.ly link
    displays as `bit.ly/…` because that is what X printed, even though the final

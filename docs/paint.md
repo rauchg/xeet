@@ -16,7 +16,7 @@ display::DisplayList ──► rasterize(dpr, images) ──► Pixmap (RGBA8) �
 | `glyph.rs` | Glyph outlines → cached coverage masks |
 | `emoji.rs` | COLRv0 layers → cached color sprites (Twemoji Mozilla) |
 | `icons.rs` | X's SVG sprite: path data, arcs, gradients |
-| `images.rs` | PNG/JPEG/WebP decoding, `object-fit: cover`, scaling, placeholders |
+| `images.rs` | PNG/JPEG/WebP decoding, X's image-service copy of a card picture, `object-fit: cover`, scaling, placeholders |
 | `encode.rs` | PNG encoding |
 | `svg.rs` | Vector export for inspection |
 
