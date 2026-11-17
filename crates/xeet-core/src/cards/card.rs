@@ -151,6 +151,11 @@ fn image_card(
             shape: s,
             image: ImageRef::Card(url.to_string()),
             focus: super::FOCUS,
+            // The large card's picture is the image service's copy for the slot
+            // (`paint::service_box`); the `summary` thumbnail's variant is not
+            // measured (the payload lists 144x144, 280x150, 386x202 and 600x314
+            // copies), so it draws the file as given.
+            service: true,
         });
         out.push(Item::PopClip);
         if player {
@@ -364,6 +369,7 @@ fn thumbnail_card(
             shape: s,
             image: ImageRef::Card(url.to_string()),
             focus: super::FOCUS,
+            service: false,
         });
         out.push(Item::PopClip);
     } else {

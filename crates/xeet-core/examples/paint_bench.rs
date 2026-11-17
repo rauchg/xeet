@@ -109,6 +109,7 @@ fn media_frame_opts(width: f32, images: bool, radius: f32) -> DisplayList {
                 shape,
                 image: ImageRef::Media(i),
                 focus: (0.5, 0.5),
+                service: false,
             });
         } else {
             list.push(Item::Placeholder {
@@ -138,6 +139,7 @@ fn media_frame(width: f32, images: bool) -> DisplayList {
                 shape,
                 image: ImageRef::Media(i),
                 focus: (0.5, 0.5),
+                service: false,
             });
         } else {
             list.push(Item::Placeholder {

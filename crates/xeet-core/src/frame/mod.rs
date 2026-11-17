@@ -649,6 +649,7 @@ fn avatar_item(ctx: &Ctx, x: f32, y: f32) -> Item {
         shape,
         image: ImageRef::Avatar,
         focus: (0.5, 0.5),
+        service: false,
     }
 }
 

@@ -259,6 +259,7 @@ fn header(
             ImageRef::Avatar
         })),
         focus: super::FOCUS,
+        service: false,
     });
     out.push(Item::PopClip);
 
@@ -362,6 +363,7 @@ fn header(
                     ImageRef::AffiliateBadge
                 })),
                 focus: super::FOCUS,
+                service: false,
             });
         } else {
             // No artwork: the placeholder draws the square, the stroke is the
@@ -468,17 +470,20 @@ mod quoted_images {
                 shape,
                 image: ImageRef::Media(0),
                 focus: (0.5, 0.5),
+                service: false,
             },
             Item::Image {
                 shape,
                 image: ImageRef::Quote(Box::new(ImageRef::Avatar)),
                 focus: (0.5, 0.5),
+                service: false,
             },
             // The "Post video" attribution avatar is the quoted post's too.
             Item::Image {
                 shape,
                 image: ImageRef::MediaSourceAvatar(1),
                 focus: (0.5, 0.5),
+                service: false,
             },
         ];
         as_quoted(&mut items);
@@ -794,6 +799,7 @@ fn nested_preview(
                 shape: shape(inner, 0.0, CornerShape::Round),
                 image: ImageRef::Quote(Box::new(ImageRef::Quote(Box::new(ImageRef::Media(0))))),
                 focus: super::FOCUS,
+                service: false,
             });
             let count = q2.media.len();
             if count > 1 {

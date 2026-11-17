@@ -545,6 +545,7 @@ fn affiliate_items(ctx: &Ctx, check: Rect, width: f32) -> Vec<Item> {
                 shape,
                 image: ImageRef::AffiliateBadge,
                 focus: (0.5, 0.5),
+                service: false,
             },
             Item::Stroke {
                 shape,

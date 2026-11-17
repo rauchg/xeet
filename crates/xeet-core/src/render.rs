@@ -251,6 +251,32 @@ fn rasterize_planned(
     let device_pixels = (f64::from(list.width) * f64::from(dpr)).ceil().max(0.0)
         * (f64::from(list.height) * f64::from(dpr)).ceil().max(0.0);
     budget.charge(device_pixels as u64 / 8, "rasterizing")?;
+    // A card picture wider than its service box is resampled into the box
+    // before it is sampled, and that pass walks the source, not the canvas:
+    // charge it by source pixels, on the same scale.
+    let mut source_pixels: u64 = 0;
+    for item in &list.items {
+        if let Item::Image {
+            shape,
+            image,
+            service: true,
+            ..
+        } = item
+        {
+            let Some(side) = paint::service_box(shape.rect.w, dpr) else {
+                continue;
+            };
+            if let Some(prepared) = images.prepared(image) {
+                let d = prepared.decoded();
+                if d.width > side || d.height > side {
+                    source_pixels += u64::from(d.width) * u64::from(d.height);
+                }
+            }
+        }
+    }
+    if source_pixels > 0 {
+        budget.charge(source_pixels / 8, "resampling card pictures")?;
+    }
 
     let pixmap = paint::rasterize(list, dpr, images);
     limits.check_output_pixels(pixmap.width, pixmap.height)?;
@@ -512,10 +538,12 @@ fn item_at(item: &Item, dx: f32, dy: f32) -> Item {
             shape,
             image,
             focus,
+            service,
         } => Item::Image {
             shape: at_shape(shape),
             image,
             focus,
+            service,
         },
         Item::Placeholder { shape, label } => Item::Placeholder {
             shape: at_shape(shape),
@@ -1376,6 +1404,7 @@ mod tests {
             shape: Shape::rect(Rect::new(0.0, 0.0, 100.0, 100.0)),
             image,
             focus: (0.5, 0.5),
+            service: false,
         });
         PostImages::for_list(post, limits, &list)
     }

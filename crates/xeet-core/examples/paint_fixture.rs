@@ -168,6 +168,7 @@ fn main() {
                     shape: shape_of(&item),
                     image: r,
                     focus,
+                    service: false,
                 });
             }
             "placeholder" => list.push(Item::Placeholder {

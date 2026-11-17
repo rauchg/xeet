@@ -15,6 +15,16 @@
 //! happens in premultiplied space, as Skia does, so transparent edges do not
 //! darken.
 //!
+//! A link card's picture takes one step before that. X does not hand the
+//! browser the page's `og:image`; it re-hosts it on its image service and the
+//! client asks for a copy fitted to a box, the smallest of `name=small` (680),
+//! `900x900`, `medium` (1200) and `large` (2048) that is wider than the
+//! picture's slot in device pixels ([`service_box`]), and Chrome scales
+//! *that*. Photos arrive
+//! the same way, but the resolver can fetch their variant (`docs/MEDIA.md`); a
+//! card's copy exists only on X's side, so the painter reproduces the
+//! service's resize ([`service_copy`]) before sampling.
+//!
 //! ## Placeholders
 //!
 //! When bytes are absent the image becomes a neutral grey card with the label
@@ -270,7 +280,13 @@ impl Tap {
 /// the mask all fold into the same pass in the order the sprite path used to
 /// apply them (coverage first, then the clip), so the result is the same bytes
 /// without a full-size sprite buffer in between.
-pub(crate) fn draw(r: &mut Renderer, shape: &Shape, image: &ImageRef, focus: (f32, f32)) {
+pub(crate) fn draw(
+    r: &mut Renderer,
+    shape: &Shape,
+    image: &ImageRef,
+    focus: (f32, f32),
+    service: bool,
+) {
     // Copy the `&dyn ImageSource` out of the renderer: the image borrow then
     // hangs off the source, not off `r`, so the canvas can still be borrowed
     // mutably below.
@@ -292,6 +308,26 @@ pub(crate) fn draw(r: &mut Renderer, shape: &Shape, image: &ImageRef, focus: (f3
         return placeholder(r, shape, "");
     }
     let dpr = r.dpr;
+    // X hands the browser a copy of a card picture fitted to the service's
+    // box, not the file; the client picks the box from the slot's device
+    // pixels (`service_box`), and the copy is what gets sampled, as Chrome
+    // samples it. A picture that already fits the box is the copy.
+    let copy = if service {
+        service_box(shape.rect.w, dpr)
+    } else {
+        None
+    };
+    let service: Option<std::sync::Arc<PreparedImage>> = match copy {
+        Some(side) if src.width > side || src.height > side => Some(match prepared {
+            Some(p) => p.service_copy(side),
+            None => std::sync::Arc::new(PreparedImage::new(service_copy(src, side))),
+        }),
+        _ => None,
+    };
+    let (prepared, src) = match &service {
+        Some(c) => (Some(&**c), c.decoded()),
+        None => (prepared, src),
+    };
     let dst = shapes::scale_rect(shape.rect, dpr);
     if !dst.w.is_finite() || !dst.h.is_finite() || dst.w <= 0.0 || dst.h <= 0.0 {
         return;
@@ -771,6 +807,206 @@ fn box_down(src: &[u8], sw: u32, sh: u32, dw: u32, dh: u32, premultiply: bool) -
     out
 }
 
+// ------------------------------------------------------- image-service copy
+
+/// The fit boxes X's image service offers for a card picture, by the name the
+/// client asks for: `small`, `900x900`, `medium`, `large`.
+const SERVICE_BOXES: [u32; 4] = [680, 900, 1200, 2048];
+
+/// The side of the box X's client asks the image service for, given the slot
+/// the picture fills (`slot` css px) and the device pixel ratio: the smallest
+/// box wider than the slot's device pixels, the rule `docs/MEDIA.md` gives for
+/// photos. `None` past the largest box: the client takes the original.
+///
+/// Read off a signed-in session at dpr 2 on the detail page of post
+/// 2122162840463376558 (rauchg, 2026-11-16), card box in css px → variant:
+/// 284, 304, 324, 336 → `small` (568–672 device px); 340, 354, 365, 396, 408,
+/// 416 → `900x900` (680–832); 476, 564 → `medium` (952–1128). The viewport's
+/// `sm:` breakpoint at 512 changes nothing; a 680 px box asks for `900x900`,
+/// so a box is taken only when it is strictly wider than the slot. No card
+/// box above 1,128 device px was observed: the `large` step (2048) and the
+/// original past it are the photo ladder's (`docs/MEDIA.md`), assumed to hold
+/// for cards.
+pub fn service_box(slot: f32, dpr: f32) -> Option<u32> {
+    if !slot.is_finite() || !dpr.is_finite() || slot <= 0.0 || dpr <= 0.0 {
+        return None;
+    }
+    let device = slot * dpr;
+    SERVICE_BOXES
+        .iter()
+        .copied()
+        .find(|&side| side as f32 > device)
+}
+
+/// The picture as X's image service serves it: fitted inside a `side` × `side`
+/// box (`name=small` is 680, `name=medium` 1200; a 1000 × 3000 portrait comes
+/// out 227 × 680, the shape `docs/MEDIA.md` shows for a photo at `small`),
+/// resampled with Lanczos-3 in sRGB. A picture that already fits comes back as
+/// it is. Against the viewer's 2× capture of post 2121745693157064899 (mobile
+/// web, card picture 2400 px wide), sampling the original straight down left
+/// 2,599 mismatched pixels in the card; through the 680 copy Lanczos-3 left 68,
+/// bicubic 71, bilinear 118, box 274. The JPEG re-encode X does on top moved
+/// 3–4 pixels between quality 85 and 95 and is not reproduced.
+pub fn service_copy(src: &DecodedImage, side: u32) -> DecodedImage {
+    let (sw, sh) = (src.width, src.height);
+    let side = side.max(1);
+    if sw <= side && sh <= side {
+        return DecodedImage {
+            width: sw,
+            height: sh,
+            rgba: src.rgba.clone(),
+        };
+    }
+    let s = (side as f64 / sw as f64).min(side as f64 / sh as f64);
+    let dw = ((sw as f64 * s).round() as u32).max(1);
+    let dh = ((sh as f64 * s).round() as u32).max(1);
+    // Filtered in f64 from the source bytes to the rounded result, without a
+    // copy of the picture in between: the horizontal pass reads the u8 texels
+    // and premultiplies each tap (a transparent edge filtered straight would
+    // bleed the colour under alpha 0, usually black, into it as a dark
+    // fringe), the vertical pass accumulates the resampled source rows one at
+    // a time, and straight alpha is divided back and rounded once, so a
+    // translucent pixel comes back as it went in. Memory is the output plus a
+    // window of resampled rows, not eight times the source.
+    let opaque = is_opaque(&src.rgba);
+    let htaps = lanczos_taps(sw, dw);
+    let vtaps = lanczos_taps(sh, dh);
+    let stride = dw as usize * 4;
+    let resample_row = |r: usize, row: &mut Vec<f64>| {
+        row.clear();
+        for (lo, ws) in &htaps {
+            let mut acc = [0f64; 4];
+            for (k, wgt) in ws.iter().enumerate() {
+                let s = (r * sw as usize + lo + k) * 4;
+                let a = src.rgba[s + 3] as f64;
+                let k = if opaque { 1.0 } else { a / 255.0 };
+                acc[0] += src.rgba[s] as f64 * k * wgt;
+                acc[1] += src.rgba[s + 1] as f64 * k * wgt;
+                acc[2] += src.rgba[s + 2] as f64 * k * wgt;
+                acc[3] += a * wgt;
+            }
+            row.extend_from_slice(&acc);
+        }
+    };
+    // The window of resampled source rows a destination row needs; windows
+    // only move down, so a row is resampled once and dropped once passed.
+    let mut window: std::collections::VecDeque<(usize, Vec<f64>)> =
+        std::collections::VecDeque::new();
+    let mut out = Vec::with_capacity(stride * dh as usize);
+    let mut acc = vec![0f64; stride];
+    for (lo, ws) in &vtaps {
+        while window.front().is_some_and(|(r, _)| *r < *lo) {
+            window.pop_front();
+        }
+        for r in *lo..*lo + ws.len() {
+            if window.back().is_none_or(|(last, _)| *last < r) {
+                let mut row = Vec::with_capacity(stride);
+                resample_row(r, &mut row);
+                window.push_back((r, row));
+            }
+        }
+        acc.iter_mut().for_each(|v| *v = 0.0);
+        for (k, wgt) in ws.iter().enumerate() {
+            let row = &window
+                .iter()
+                .find(|(r, _)| *r == lo + k)
+                .expect("row in window")
+                .1;
+            for (v, x) in acc.iter_mut().zip(row) {
+                *v += x * wgt;
+            }
+        }
+        for px in acc.as_chunks::<4>().0 {
+            let a = px[3].round().clamp(0.0, 255.0);
+            if !opaque && a <= 0.0 {
+                out.extend_from_slice(&[0, 0, 0, 0]);
+                continue;
+            }
+            let k = if opaque { 1.0 } else { 255.0 / px[3] };
+            for c in &px[..3] {
+                out.push((c * k).round().clamp(0.0, 255.0) as u8);
+            }
+            out.push(a as u8);
+        }
+    }
+    DecodedImage {
+        width: dw,
+        height: dh,
+        rgba: out,
+    }
+}
+
+/// `sin` without libm. `f64::sin` is the platform's, and its last bits differ
+/// between macOS and wasm32 (12,548 of 200,000 kernel weights, by up to 4 ulp),
+/// which the determinism gate sees as a byte flip once a texel is rounded. The
+/// argument is folded into [-π/2, π/2] and summed as the Taylor series to x¹⁹
+/// (within 1e-15 there) with IEEE operations only, the coefficients constants;
+/// the taps are pinned by hash natively, and `determinism.mjs` is what proves
+/// the wasm build matches.
+fn sin_det(x: f64) -> f64 {
+    use std::f64::consts::PI;
+    let mut x = x - (x / (2.0 * PI)).round() * (2.0 * PI);
+    if x > PI / 2.0 {
+        x = PI - x;
+    } else if x < -PI / 2.0 {
+        x = -PI - x;
+    }
+    const C: [f64; 10] = [
+        1.0,
+        -1.0 / 6.0,
+        1.0 / 120.0,
+        -1.0 / 5040.0,
+        1.0 / 362_880.0,
+        -1.0 / 39_916_800.0,
+        1.0 / 6_227_020_800.0,
+        -1.0 / 1_307_674_368_000.0,
+        1.0 / 355_687_428_096_000.0,
+        -1.0 / 121_645_100_408_832_000.0,
+    ];
+    let x2 = x * x;
+    let mut acc = C[9];
+    for c in C[..9].iter().rev() {
+        acc = acc * x2 + c;
+    }
+    x * acc
+}
+
+/// Lanczos-3 taps for one axis: per destination index, the first source index
+/// of its window and the normalised weights, the support widened by the
+/// downscale factor as PIL and ImageMagick do.
+fn lanczos_taps(len: u32, dst: u32) -> Vec<(usize, Vec<f64>)> {
+    const A: f64 = 3.0;
+    let lanczos = |x: f64| -> f64 {
+        if x == 0.0 {
+            1.0
+        } else if x.abs() >= A {
+            0.0
+        } else {
+            let px = std::f64::consts::PI * x;
+            A * sin_det(px) * sin_det(px / A) / (px * px)
+        }
+    };
+    let scale = len as f64 / dst as f64;
+    let support = A * scale.max(1.0);
+    (0..dst)
+        .map(|i| {
+            let center = (i as f64 + 0.5) * scale;
+            let lo = (center - support).floor().max(0.0) as usize;
+            let hi = ((center + support).ceil() as usize).min(len as usize);
+            let mut ws: Vec<f64> = (lo..hi)
+                .map(|j| lanczos((j as f64 + 0.5 - center) / scale.max(1.0)))
+                .collect();
+            let sum: f64 = ws.iter().sum();
+            if sum != 0.0 {
+                for v in &mut ws {
+                    *v /= sum;
+                }
+            }
+            (lo, ws)
+        })
+        .collect()
+}
+
 // --------------------------------------------------------------- placeholder
 
 const PLACEHOLDER_FILL: Rgba = Rgba::hex(0xCFD9DE);
@@ -822,5 +1058,221 @@ pub(crate) fn placeholder(r: &mut Renderer, shape: &Shape, label: &str) {
                 &glyphs,
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod service_tests {
+    use super::*;
+
+    /// The service's box is square: 2400 × 1256 fits 680 × 356 at `small` and 1200 × 628 at `medium`
+    /// (the sizes X served for posts 2121745693157064899 and 2122162840463376558); a 1000 × 3000
+    /// portrait fits 227 × 680, the shape `docs/MEDIA.md` shows for a photo at `small`.
+    #[test]
+    fn the_copy_fits_the_services_box() {
+        let wide = DecodedImage {
+            width: 2400,
+            height: 1256,
+            rgba: vec![200; 2400 * 1256 * 4],
+        };
+        let small = service_copy(&wide, 680);
+        assert_eq!((small.width, small.height), (680, 356));
+        let medium = service_copy(&wide, 1200);
+        assert_eq!((medium.width, medium.height), (1200, 628));
+        assert!(
+            small.rgba.iter().all(|&v| v == 200),
+            "a flat picture stays flat"
+        );
+        let tall = DecodedImage {
+            width: 1000,
+            height: 3000,
+            rgba: vec![90; 1000 * 3000 * 4],
+        };
+        let t = service_copy(&tall, 680);
+        assert_eq!((t.width, t.height), (227, 680));
+        let fits = DecodedImage {
+            width: 600,
+            height: 314,
+            rgba: vec![7; 600 * 314 * 4],
+        };
+        let f = service_copy(&fits, 680);
+        assert_eq!((f.width, f.height, f.rgba), (600, 314, fits.rgba));
+    }
+
+    /// A transparent margin (alpha 0, black underneath) must not darken the picture's edge: the filter runs on
+    /// premultiplied texels, so a half-covered edge pixel is white at half alpha, not grey.
+    #[test]
+    fn transparent_edges_do_not_fringe() {
+        let (w, h) = (1360u32, 8u32);
+        let mut rgba = vec![0u8; (w * h * 4) as usize];
+        for y in 0..h {
+            for x in 680..w {
+                let i = ((y * w + x) * 4) as usize;
+                rgba[i..i + 4].copy_from_slice(&[255, 255, 255, 255]);
+            }
+        }
+        let src = DecodedImage {
+            width: w,
+            height: h,
+            rgba,
+        };
+        let d = service_copy(&src, 680);
+        assert_eq!((d.width, d.height), (680, 4));
+        for x in 0..680usize {
+            let px = &d.rgba[x * 4..x * 4 + 4];
+            if px[3] > 0 {
+                assert!(
+                    px[0] >= 250 && px[1] >= 250 && px[2] >= 250,
+                    "pixel {x} with alpha {} is {:?}, not white",
+                    px[3],
+                    &px[..3]
+                );
+            }
+        }
+    }
+
+    /// A translucent picture comes back as it went in: (200, 200, 200, 128) is premultiplied, filtered and
+    /// divided back in f64, rounded once, so no unit is lost on the way; opaque pixels are exact too.
+    #[test]
+    fn translucent_pixels_round_trip() {
+        let (w, h) = (1360u32, 8u32);
+        let src = DecodedImage {
+            width: w,
+            height: h,
+            rgba: (0..w * h).flat_map(|_| [200, 200, 200, 128]).collect(),
+        };
+        let d = service_copy(&src, 680);
+        assert_eq!((d.width, d.height), (680, 4));
+        assert!(
+            d.rgba
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .all(|px| *px == [200, 200, 200, 128]),
+            "a flat translucent picture changed"
+        );
+        let opaque = DecodedImage {
+            width: w,
+            height: h,
+            rgba: (0..w * h).flat_map(|_| [17, 250, 3, 255]).collect(),
+        };
+        let d = service_copy(&opaque, 680);
+        assert!(d
+            .rgba
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .all(|px| *px == [17, 250, 3, 255]));
+    }
+
+    /// Lanczos keeps a hard edge where a box filter smears it over the whole window.
+    #[test]
+    fn lanczos_keeps_edges_sharp() {
+        let w = 64u32;
+        let mut rgba: Vec<u8> = (0..(w * 4) as usize).flat_map(|_| [0, 0, 0, 255]).collect();
+        for y in 0..4 {
+            for x in 32..64 {
+                let i = ((y * w + x) * 4) as usize;
+                rgba[i..i + 4].copy_from_slice(&[255, 255, 255, 255]);
+            }
+        }
+        let src = DecodedImage {
+            width: w,
+            height: 4,
+            rgba,
+        };
+        let d = service_copy(&src, 16);
+        assert_eq!((d.width, d.height), (16, 1));
+        let row: Vec<u8> = (0..16).map(|x| d.rgba[x * 4]).collect();
+        assert!(row[..6].iter().all(|&v| v < 24), "left stays dark: {row:?}");
+        assert!(
+            row[10..].iter().all(|&v| v > 231),
+            "right stays light: {row:?}"
+        );
+    }
+
+    /// `sin_det` is `sin` to 1e-14 across the range the kernel asks for, and the kernel it builds is the
+    /// same bits on every target: the hash below was taken on macOS arm64 and holds on wasm32 and Linux
+    /// because nothing in it reaches libm.
+    #[test]
+    fn the_kernel_is_the_same_bits_everywhere() {
+        for i in -400..=400 {
+            let x = i as f64 * 0.025;
+            assert!((sin_det(x) - x.sin()).abs() < 1e-14, "sin_det({x})");
+        }
+        let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
+        for (len, dst) in [
+            (2400u32, 1200u32),
+            (1256, 628),
+            (2400, 680),
+            (1256, 356),
+            (3000, 680),
+            (1000, 227),
+            (64, 16),
+        ] {
+            for (lo, ws) in lanczos_taps(len, dst) {
+                for b in (lo as u64).to_le_bytes() {
+                    hash = (hash ^ b as u64).wrapping_mul(0x0000_0100_0000_01b3);
+                }
+                for w in ws {
+                    for b in w.to_bits().to_le_bytes() {
+                        hash = (hash ^ b as u64).wrapping_mul(0x0000_0100_0000_01b3);
+                    }
+                }
+            }
+        }
+        assert_eq!(hash, 0x62aa_b0f0_3ee8_0322, "the Lanczos taps changed bits");
+    }
+
+    /// A prepared image keeps the copy, prepared in turn (opacity and mips once): the second ask is the
+    /// same allocation.
+    #[test]
+    fn a_prepared_image_keeps_its_copy() {
+        let img = PreparedImage::new(DecodedImage {
+            width: 1360,
+            height: 8,
+            rgba: (0..1360 * 8).flat_map(|_| [90, 90, 90, 255]).collect(),
+        });
+        let a = img.service_copy(680);
+        let b = img.service_copy(680);
+        assert!(std::sync::Arc::ptr_eq(&a, &b));
+        assert_eq!((a.decoded().width, a.decoded().height), (680, 4));
+        assert!(a.is_opaque());
+        assert!(img.bytes() >= 1360 * 8 * 4 + 680 * 4 * 4);
+    }
+
+    /// The box follows the slot's device pixels, not the viewport: every row of
+    /// the signed-in dpr 2 session on post 2122162840463376558's detail page,
+    /// and the dpr 1 and 3 cases the same rule gives.
+    #[test]
+    fn the_service_box_is_the_smallest_wider_than_the_slots_device_pixels() {
+        // Observed at dpr 2: card box in css px → variant.
+        for (slot, side) in [
+            (284.0, 680),
+            (304.0, 680),
+            (324.0, 680),
+            (336.0, 680),
+            (340.0, 900),
+            (354.0, 900),
+            (365.0, 900),
+            (396.0, 900),
+            (408.0, 900),
+            (416.0, 900),
+            (476.0, 1200),
+            (564.0, 1200),
+        ] {
+            assert_eq!(service_box(slot, 2.0), Some(side), "{slot} css at dpr 2");
+        }
+        // 680 device pixels ask for `900x900`: the box has to be strictly wider.
+        assert_eq!(service_box(680.0, 1.0), Some(900));
+        assert_eq!(service_box(679.0, 1.0), Some(680));
+        // A phone: 354 css on the detail page at dpr 3 is 1,062 device pixels,
+        // `medium`; a 1200-wide original then fits and is drawn as given.
+        assert_eq!(service_box(354.0, 3.0), Some(1200));
+        assert_eq!(service_box(322.0, 3.0), Some(1200));
+        // Past `large` the client takes the original.
+        assert_eq!(service_box(1100.0, 2.0), None);
+        assert_eq!(service_box(0.0, 2.0), None);
+        assert_eq!(service_box(300.0, f32::NAN), None);
     }
 }

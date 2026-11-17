@@ -38,7 +38,7 @@ mod shapes;
 mod svg;
 
 pub use encode::{encode_png, encode_png_best};
-pub use images::{decode_image, DecodeError, Limits};
+pub use images::{decode_image, service_box, service_copy, DecodeError, Limits};
 pub use svg::to_svg;
 
 /// Fills up to this many device pixels are rasterized with exact-area coverage
@@ -107,6 +107,10 @@ pub struct PreparedImage {
     premultiplied: OnceLock<Vec<u8>>,
     /// Halved levels below the source: `(level, width, height, texels)`.
     mips: Mutex<Vec<MipLevel>>,
+    /// X's image-service copies of a card picture, by the side of the service's
+    /// box ([`images::service_copy`]), each prepared in turn, so a second draw
+    /// into the same box pays for neither the resize nor the mips.
+    service: Mutex<Vec<(u32, Arc<PreparedImage>)>>,
 }
 
 impl PreparedImage {
@@ -117,7 +121,23 @@ impl PreparedImage {
             opaque,
             premultiplied: OnceLock::new(),
             mips: Mutex::new(Vec::new()),
+            service: Mutex::new(Vec::new()),
         }
+    }
+
+    /// The image as X's image service serves it in a `side` × `side` box,
+    /// prepared, built on first use and kept.
+    pub(crate) fn service_copy(&self, side: u32) -> Arc<PreparedImage> {
+        let mut cache = self.service.lock().unwrap_or_else(|e| e.into_inner());
+        if let Some((_, copy)) = cache.iter().find(|(w, _)| *w == side) {
+            return Arc::clone(copy);
+        }
+        let copy = Arc::new(PreparedImage::new(images::service_copy(
+            &self.decoded,
+            side,
+        )));
+        cache.push((side, Arc::clone(&copy)));
+        copy
     }
 
     /// The straight-alpha pixels.
@@ -132,9 +152,15 @@ impl PreparedImage {
             .lock()
             .map(|m| m.iter().map(|(_, _, _, d)| d.len()).sum::<usize>())
             .unwrap_or(0);
+        let service = self
+            .service
+            .lock()
+            .map(|s| s.iter().map(|(_, d)| d.bytes()).sum::<usize>())
+            .unwrap_or(0);
         self.decoded.rgba.len()
             + self.premultiplied.get().map_or(0, |p| p.len())
             + mips
+            + service
             + std::mem::size_of::<PreparedImage>()
     }
 
@@ -345,7 +371,8 @@ impl Renderer<'_> {
                 shape,
                 image,
                 focus,
-            } => self.image(shape, image, *focus),
+                service,
+            } => self.image(shape, image, *focus, *service),
             Item::Placeholder { shape, label } => self.placeholder(shape, label),
             Item::PushClip { shape } => {
                 if self.clips.len() < 64 {
@@ -945,8 +972,8 @@ impl Renderer<'_> {
         icons::draw(self, name, rect, color);
     }
 
-    fn image(&mut self, shape: &Shape, image: &ImageRef, focus: (f32, f32)) {
-        images::draw(self, shape, image, focus);
+    fn image(&mut self, shape: &Shape, image: &ImageRef, focus: (f32, f32), service: bool) {
+        images::draw(self, shape, image, focus, service);
     }
 
     fn placeholder(&mut self, shape: &Shape, label: &str) {
@@ -1150,6 +1177,7 @@ mod tests {
                 shape: Shape::default(),
                 image: ImageRef::Media(0),
                 focus: (f32::NAN, 0.0),
+                service: false,
             },
             Item::Placeholder {
                 shape: Shape::rounded(Rect::new(20.0, 20.0, 10.0, 8.0), 2.0),
@@ -1232,6 +1260,7 @@ mod tests {
             shape: Shape::rounded(Rect::new(4.0, 4.0, 32.0, 22.0), 4.0),
             image: ImageRef::Media(0),
             focus: (0.0, 0.0),
+            service: false,
         }]);
         let p = rasterize(&list, 4.0, &srcs);
         let mid = p.pixel(80, 60).unwrap();
@@ -1278,6 +1307,7 @@ mod tests {
             shape: Shape::rounded(Rect::new(0.0, 0.0, 20.0, 20.0), 2.0),
             image: ImageRef::Media(0),
             focus: (0.5, 0.5),
+            service: false,
         }]);
         let p = rasterize(&list, 2.0, &cached);
         assert_eq!(cached.calls.get(), 0, "rgba() should not be needed");
@@ -1305,6 +1335,7 @@ mod tests {
                 shape: Shape::rect(Rect::new(0.0, 0.0, 40.0, 30.0)),
                 image: ImageRef::Media(0),
                 focus: (0.5, 0.5),
+                service: false,
             },
             Item::PopClip,
         ]);
@@ -1329,6 +1360,7 @@ mod tests {
                 shape: Shape::default(),
                 image: ImageRef::Avatar,
                 focus: (0.5, 0.5),
+                service: false,
             },
         ]);
         let svg = to_svg(&list);
@@ -1403,6 +1435,7 @@ mod tests {
             shape: badge,
             image: ImageRef::AffiliateBadge,
             focus: (0.5, 0.5),
+            service: false,
         }]);
         for dpr in [1.0, 2.0, 3.0] {
             let p = rasterize(&list, dpr, &srcs);

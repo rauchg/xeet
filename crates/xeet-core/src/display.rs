@@ -115,10 +115,16 @@ pub enum Item {
     },
     /// A raster image, scaled to cover `shape` (CSS `object-fit: cover`) with
     /// the focal point `focus` in 0..=1 of the source.
+    ///
+    /// `service` marks a picture the browser gets from X's image service as a
+    /// copy fitted to a box rather than as the file. The painter picks the box
+    /// from this item's slot width and the render's dpr (`paint::service_box`)
+    /// and resizes into it before sampling; `false` draws the file as given.
     Image {
         shape: Shape,
         image: ImageRef,
         focus: (f32, f32),
+        service: bool,
     },
     /// Where an image would go when no bytes were given.
     Placeholder {
