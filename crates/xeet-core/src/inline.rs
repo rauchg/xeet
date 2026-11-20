@@ -78,12 +78,23 @@ impl Span {
     }
 }
 
+/// A [`BlockStyle::width`] this large is no box at all. Callers pass `f32::MAX`
+/// (or a quarter of it) to measure a block's max-content width, and then often
+/// draw that block as it is: a name, a handle, a badge label. Such a block is a
+/// shrink-to-fit box, as wide as its widest line, so a right-to-left line starts
+/// at the block's own left edge. Aligned against the unbounded width instead, it
+/// would sit some 10^37 px to the right: an Arabic or Hebrew display name drew
+/// nothing at all.
+pub const UNBOUNDED: f32 = 1.0e9;
+
 #[derive(Clone, Copy, Debug)]
 pub struct BlockStyle {
     pub size: f32,
     pub line_height: f32,
     /// Weight of the block itself; sets the strut and the ellipsis font.
     pub weight: u16,
+    /// The box's width. At or above [`UNBOUNDED`] there is no box: the block
+    /// is measured at its max-content width and is as wide as its widest line.
     pub width: f32,
     pub max_lines: Option<usize>,
     pub wrap: Wrap,
@@ -370,6 +381,19 @@ pub fn layout(spans: &[Span], st: &BlockStyle) -> TextBlock {
             truncated = true;
             if let Some(last) = lines.last_mut() {
                 ellipsize(&ctx, last);
+            }
+        }
+    }
+
+    // A shrink-to-fit block (see [`UNBOUNDED`]): its right edge is its widest
+    // line, and every right-to-left line ends there.
+    if rtl && st.width >= UNBOUNDED {
+        let edge = lines.iter().map(|l| l.width).fold(0.0f32, f32::max);
+        for line in &mut lines {
+            let total: f32 = line.runs.iter().map(|r| r.width).sum();
+            let shift = edge - total;
+            for r in &mut line.runs {
+                r.x += shift;
             }
         }
     }
@@ -969,8 +993,11 @@ fn make_line(ctx: &Ctx, mut runs: Vec<Run>, start: usize, end: usize, width: f32
         }
     }
     // `text-align: start`. A right-to-left line sits against the right edge;
-    // its trailing spaces, at the paragraph level, hang off the left.
-    if ctx.base % 2 == 1 {
+    // its trailing spaces, at the paragraph level, hang off the left. With no
+    // box, the edge is the block's widest line, which `layout` aligns to once
+    // every line is known (shifting by an unbounded width here would also
+    // round every position away in f32).
+    if ctx.base % 2 == 1 && st.width < UNBOUNDED {
         let total: f32 = runs.iter().map(|r| r.width).sum();
         let shift = st.width - total;
         for r in &mut runs {

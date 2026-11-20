@@ -504,7 +504,8 @@ pub(crate) fn tag_line(cx: &Ctx, tags: &[String], y0: f32, out: &mut Vec<Item>) 
     let Some(label) = tag_label(tags) else {
         return 0.0;
     };
-    let block = super::paragraph(cx, &label, SUBTEXT2, 400, cx.p.secondary, cx.width, None);
+    // No `dir` on the box: it takes the page's `ltr` (see `paragraph_ltr`).
+    let block = super::paragraph_ltr(cx, &label, SUBTEXT2, 400, cx.p.secondary, cx.width, None);
     push_text(out, &block, 0.0, y0, cx.width);
     block.height
 }

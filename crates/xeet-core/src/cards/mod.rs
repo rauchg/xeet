@@ -484,6 +484,36 @@ pub(crate) fn paragraph_wrapped(
     inline::layout(&[span], &st)
 }
 
+/// Like [`paragraph`], for a box with no `dir` of its own: it takes the page's
+/// `ltr`. The media tag line is one (`div.w-fit`, no `dir`), so a right-to-left
+/// name starts at its left edge and "A and 6 others" keeps its English order.
+/// Names in the post and quote headers and the media "From" credit are not:
+/// those boxes carry `dir="auto"`. Adapted from @mrwnh's `names()` in #11.
+pub(crate) fn paragraph_ltr(
+    cx: &Ctx,
+    text: &str,
+    size: (f32, f32),
+    weight: u16,
+    color: Rgba,
+    width: f32,
+    max_lines: Option<usize>,
+) -> TextBlock {
+    let (size, line_height) = cx.ty(size);
+    let span = Span::new(text, color, weight);
+    let st = BlockStyle {
+        size,
+        line_height,
+        weight,
+        width,
+        max_lines,
+        wrap: Wrap::Anywhere,
+        preserve: true,
+        dir: Dir::Ltr,
+        tab_size: 4.0,
+    };
+    inline::layout(&[span], &st)
+}
+
 /// Lays out the rules stream's body spans: one [`Span`] per run, with entities
 /// in the brand color, exactly as the frame draws a post's own text.
 pub(crate) fn body_block(

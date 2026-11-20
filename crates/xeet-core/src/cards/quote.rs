@@ -305,18 +305,26 @@ fn header(
         f32::MAX,
         Some(1),
     );
-    let name = paragraph(
-        cx,
-        post.author.name.trim(),
-        BODY,
-        700,
-        cx.p.primary,
-        name_cap,
-        Some(1),
-    );
     // A clamped name keeps the width of its box (`max-w-full` on a flex item),
     // not of the text it managed to fit.
     let name_adv = natural.width.min(name_cap);
+    // The name's box (`block truncate`, `dir="auto"`) shrinks to the name, so a
+    // name that fits is the max-content block itself. Laid out across the whole
+    // cap instead, a right-to-left name sat against the cap's far edge, on top
+    // of its own badge and handle.
+    let name = if natural.width <= name_cap {
+        natural
+    } else {
+        paragraph(
+            cx,
+            post.author.name.trim(),
+            BODY,
+            700,
+            cx.p.primary,
+            name_cap,
+            Some(1),
+        )
+    };
     push_text(out, &name, x, centered(name.height), avail(x));
     x += name_adv;
 
